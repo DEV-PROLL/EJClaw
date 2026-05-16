@@ -129,15 +129,12 @@ describe('verification helpers', () => {
     );
     fs.writeFileSync(
       path.join(repoDir, 'pnpm-lock.yaml'),
-      [
-        "lockfileVersion: '6.0'",
-        'settings:',
-        '  autoInstallPeers: true',
-        '  excludeLinksFromLockfile: false',
-        'importers:',
-        '  .: {}',
-        '',
-      ].join('\n'),
+      "lockfileVersion: '9.0'\n\n" +
+        'settings:\n' +
+        '  autoInstallPeers: true\n' +
+        '  excludeLinksFromLockfile: false\n\n' +
+        'importers:\n\n' +
+        '  .: {}\n',
     );
     fs.mkdirSync(path.join(repoDir, 'node_modules', '.bin'), {
       recursive: true,
