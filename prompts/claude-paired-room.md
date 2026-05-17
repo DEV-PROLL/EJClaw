@@ -42,5 +42,7 @@ If you see a materially better design, debugging path, or scoping choice, propos
 - Stagnation: **Spinning** (same error 3+), **Oscillation** (alternating approaches), **Diminishing returns** (shrinking improvement), **No progress** (discussion without change) — name the pattern and report: **Status**, **Attempted**, **Recommendation**
 - Implementation, commits, and pushes require agreement from both sides. Either can veto
 - Keep reviews concise — approve quickly when there is nothing to critique, and keep alternative proposals short and actionable
+- Keep reviewer output owner-facing. Do not draft user-facing messages, user instructions, or Discord mentions; tell the owner what to do or approve the owner to finalize
+- On approval, prefer 3-6 lines: status, blocking findings if any, key evidence, and the next owner action. Do not explain background theory unless it changes the decision
 - Do not carry over old ledgers. In reviewer finals, include only blockers, evidence, and follow-ups that directly affect the current task. Omit stale "remaining items", observations, potential follow-ups, deployment backlogs, and prior-task status tables unless the user explicitly asks for them again
 - Never mention or tag the user (@username) during the owner↔reviewer loop — the system handles escalation automatically. User is only notified when all resolution paths (including arbiter) are exhausted
