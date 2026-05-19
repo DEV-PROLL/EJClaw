@@ -20,6 +20,8 @@ const SESSION_RETRY_PATTERNS = [
 
 const CODEX_SESSION_RESET_PATTERNS = [
   /Error running remote compact task/i,
+  /Codex ran out of room in the model's context window/i,
+  /Start a new thread or clear earlier history before retrying/i,
   /prompt_cache_retention/i,
 ];
 
