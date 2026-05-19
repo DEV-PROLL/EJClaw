@@ -73,6 +73,7 @@ describe('platform-prompts', () => {
 
     const codexPairedPrompt = readPairedRoomPrompt('codex', repoRoot);
     expect(codexPairedPrompt).toContain('reviewer');
+    expect(codexPairedPrompt).toContain('the output is invalid');
     expect(codexPairedPrompt).toContain('EJCLAW_WORK_DIR');
     expect(codexPairedPrompt).toContain(
       'canonical verification root for this turn',
@@ -82,6 +83,9 @@ describe('platform-prompts', () => {
     );
     expect(codexPairedPrompt).toContain(
       'Separate correctness issues from improvement ideas',
+    );
+    expect(codexPairedPrompt).toContain(
+      'Do not present static analysis as completed verification',
     );
     expect(codexPairedPrompt).toContain('Keep reviewer output owner-facing');
     expect(codexPairedPrompt).toContain('prefer 3-6 lines');

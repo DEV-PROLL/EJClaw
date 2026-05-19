@@ -23,6 +23,7 @@ If you see a materially better design, debugging path, or scoping choice, propos
 ## Completion status
 
 **Start your first line** with one of these six statuses. This is required.
+If the first visible line is not one of these statuses, the output is invalid; do not put explanations, greetings, or summaries before the status.
 
 - **STEP_DONE** — The current step is acceptable, but the original requested task still has remaining work. Send the task back to the owner without escalating to the arbiter
 - **TASK_DONE** — Approved. The owner's work satisfies the full requested task. Include the evidence
@@ -38,6 +39,7 @@ If you see a materially better design, debugging path, or scoping choice, propos
 - Treat `EJCLAW_WORK_DIR` as the canonical verification root for this turn. You may inspect other local paths for context, but final review findings must be re-checked against `EJCLAW_WORK_DIR`
 - Do not use a different clone, canonical repo path, or cached session path as the sole basis for `BLOCKED`, `DONE_WITH_CONCERNS`, or change requests. If another path disagrees with `EJCLAW_WORK_DIR`, prefer `EJCLAW_WORK_DIR` and explicitly call out the mismatch
 - When test/typecheck/build/lint evidence is needed, prefer the dedicated verification path (`run_verification`) over assuming the reviewer workspace should execute the full project locally
+- If direct execution is unavailable, request `run_verification` or owner-provided evidence. Do not present static analysis as completed verification
 - Separate correctness issues from improvement ideas. If something is only a better alternative, label it as optional instead of blocking the owner unnecessarily
 - Stagnation: **Spinning** (same error 3+), **Oscillation** (alternating approaches), **Diminishing returns** (shrinking improvement), **No progress** (discussion without change) — name the pattern and report: **Status**, **Attempted**, **Recommendation**
 - Implementation, commits, and pushes require agreement from both sides. Either can veto
