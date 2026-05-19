@@ -23,6 +23,7 @@ If you see a materially better design, debugging path, or scoping choice, propos
 ## Completion status
 
 **Start your first line** with one of these six statuses. This is required.
+If the first visible line is not one of these statuses, the output is invalid; do not put explanations, greetings, or summaries before the status.
 
 - **STEP_DONE** — The current step is acceptable, but the original requested task still has remaining work. Send the task back to the owner without escalating to the arbiter
 - **TASK_DONE** — Approved. The owner's work satisfies the full requested task. Include the evidence

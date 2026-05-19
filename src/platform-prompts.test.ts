@@ -73,6 +73,7 @@ describe('platform-prompts', () => {
 
     const codexPairedPrompt = readPairedRoomPrompt('codex', repoRoot);
     expect(codexPairedPrompt).toContain('reviewer');
+    expect(codexPairedPrompt).toContain('the output is invalid');
     expect(codexPairedPrompt).toContain('EJCLAW_WORK_DIR');
     expect(codexPairedPrompt).toContain(
       'canonical verification root for this turn',
