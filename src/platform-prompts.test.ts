@@ -83,6 +83,9 @@ describe('platform-prompts', () => {
     expect(codexPairedPrompt).toContain(
       'Separate correctness issues from improvement ideas',
     );
+    expect(codexPairedPrompt).toContain(
+      'Do not present static analysis as completed verification',
+    );
     expect(codexPairedPrompt).toContain('Keep reviewer output owner-facing');
     expect(codexPairedPrompt).toContain('prefer 3-6 lines');
     expect(codexPairedPrompt).not.toContain('owner-side paired agent');
