@@ -3461,7 +3461,7 @@ describe('runAgentForGroup Claude rotation', () => {
     expect(deps.clearSession).toHaveBeenCalledWith('test-claude');
   });
 
-  it('drops a poisoned Codex session id before retrying a fresh session after remote compaction failure', async () => {
+  it('drops a poisoned Codex session id before retrying after context-window overflow', async () => {
     const group = {
       ...makeGroup(),
       folder: 'test-codex',
@@ -3494,20 +3494,19 @@ describe('runAgentForGroup Claude rotation', () => {
     vi.mocked(agentRunner.runAgentProcess)
       .mockImplementationOnce(async (_group, input) => {
         expect(input.sessionId).toBe('stale-codex-session-id');
-        throw new Error(
-          "Error running remote compact task: Unknown parameter: 'prompt_cache_retention'",
-        );
+        return {
+          status: 'error',
+          result: null,
+          error: "Codex ran out of room in the model's context window.",
+          newSessionId: 'stale-codex-session-id',
+        };
       })
       .mockImplementationOnce(async (_group, input, _onProcess, onOutput) => {
         expect(input.sessionId).toBeUndefined();
-        await onOutput?.({
-          status: 'success',
-          phase: 'final',
-          result: 'fresh Codex retry success',
-        });
+        await onOutput?.({ status: 'success', phase: 'final', result: 'ok' });
         return {
           status: 'success',
-          result: 'fresh Codex retry success',
+          result: 'ok',
           newSessionId: 'fresh-codex-session-id',
         };
       });

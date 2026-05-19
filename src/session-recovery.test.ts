@@ -135,6 +135,17 @@ describe('shouldRetryFreshCodexSessionOnAgentFailure', () => {
     ).toBe(true);
   });
 
+  it('retries Codex context-window overflow with a fresh session', () => {
+    const output = {
+      result: null,
+      error:
+        "Codex ran out of room in the model's context window.\nStart a new thread or clear earlier history before retrying.",
+    };
+
+    expect(shouldResetCodexSessionOnAgentFailure(output)).toBe(true);
+    expect(shouldRetryFreshCodexSessionOnAgentFailure(output)).toBe(true);
+  });
+
   it('does not retry generic Codex Bad Request signals during observation-only rollout', () => {
     const output = {
       result: null,

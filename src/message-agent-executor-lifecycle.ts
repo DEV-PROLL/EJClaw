@@ -21,6 +21,23 @@ import { getErrorMessage } from './utils.js';
 
 type AttemptResult = 'success' | 'error';
 
+function isRetryableCodexSessionFailureAttempt(args: {
+  provider: 'claude' | 'codex';
+  attempt: MessageAgentAttempt;
+}): boolean {
+  const { provider, attempt } = args;
+  if (provider !== 'codex' || attempt.sawOutput) return false;
+  if (attempt.retryableSessionFailureDetected === true) return true;
+  if (attempt.output != null)
+    return shouldRetryFreshCodexSessionOnAgentFailure(attempt.output);
+  return attempt.error == null
+    ? false
+    : shouldRetryFreshCodexSessionOnAgentFailure({
+        result: null,
+        error: getErrorMessage(attempt.error),
+      });
+}
+
 export async function executeMessageAgentAttemptLifecycle(args: {
   provider: 'claude' | 'codex';
   runAttempt: (provider: 'claude' | 'codex') => Promise<MessageAgentAttempt>;
@@ -212,34 +229,13 @@ export async function executeMessageAgentAttemptLifecycle(args: {
     };
   };
 
-  const isRetryableCodexSessionFailure = (
-    attempt: MessageAgentAttempt,
-  ): boolean => {
-    if (provider !== 'codex' || attempt.sawOutput) {
-      return false;
-    }
-
-    if (attempt.retryableSessionFailureDetected === true) {
-      return true;
-    }
-
-    if (attempt.error == null) {
-      return false;
-    }
-
-    return shouldRetryFreshCodexSessionOnAgentFailure({
-      result: null,
-      error: getErrorMessage(attempt.error),
-    });
-  };
-
   const recoverRetryableCodexSessionFailure = async (
     attempt: MessageAgentAttempt,
   ): Promise<{
     attempt: MessageAgentAttempt;
     resolved: AttemptResult | null;
   }> => {
-    if (!isRetryableCodexSessionFailure(attempt)) {
+    if (!isRetryableCodexSessionFailureAttempt({ provider, attempt })) {
       return { attempt, resolved: null };
     }
 
@@ -250,7 +246,12 @@ export async function executeMessageAgentAttemptLifecycle(args: {
     );
 
     const freshAttempt = await runTrackedAttempt('codex');
-    if (!isRetryableCodexSessionFailure(freshAttempt)) {
+    if (
+      !isRetryableCodexSessionFailureAttempt({
+        provider,
+        attempt: freshAttempt,
+      })
+    ) {
       return { attempt: freshAttempt, resolved: null };
     }
 
