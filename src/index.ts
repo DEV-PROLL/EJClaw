@@ -34,6 +34,7 @@ import {
   buildRestartAnnouncement,
   buildInterruptedRestartAnnouncement,
   consumeRestartContext,
+  getRecoverableInterruptedGroups,
   getInterruptedRecoveryCandidates,
   inferRecentRestartContext,
   type RestartContext,
@@ -196,7 +197,9 @@ async function announceRestartRecovery(
       'Sent explicit restart recovery announcement',
     );
 
-    for (const interrupted of explicitContext.interruptedGroups ?? []) {
+    for (const interrupted of getRecoverableInterruptedGroups(
+      explicitContext,
+    )) {
       if (interrupted.chatJid === explicitContext.chatJid) continue;
       if (hasRecentRestartAnnouncement(interrupted.chatJid, dedupeSince)) {
         continue;
@@ -265,8 +268,8 @@ async function main(): Promise<void> {
         (
           status,
         ): status is typeof status & {
-          status: 'processing' | 'waiting';
-        } => status.status !== 'inactive',
+          status: 'processing';
+        } => status.status === 'processing',
       )
       .map((status) => ({
         chatJid: status.jid,
