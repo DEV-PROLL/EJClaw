@@ -97,4 +97,31 @@ describe('platform-prompts', () => {
     );
     expect(failoverPlatformPrompt).toContain('acting as `클코`');
   });
+
+  it('keeps the superpowers-derived debugging guidance compressed and role-scoped', () => {
+    const repoRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+    );
+    const promptsDir = path.join(repoRoot, 'prompts');
+    const ownerPrompt = fs.readFileSync(
+      path.join(promptsDir, 'owner-common-paired-room.md'),
+      'utf-8',
+    );
+    const reviewerPrompt = fs.readFileSync(
+      path.join(promptsDir, 'claude-paired-room.md'),
+      'utf-8',
+    );
+
+    for (const prompt of [ownerPrompt, reviewerPrompt]) {
+      expect(prompt).toContain('## Debugging discipline');
+      expect(prompt).toContain('root-cause');
+      expect(prompt).toContain('component-boundary data');
+      expect(prompt).toContain('same failed fix path');
+      expect(prompt).toContain('3 times');
+      expect(prompt).not.toContain('superpowers');
+      expect(prompt).not.toContain('NO FIXES WITHOUT ROOT CAUSE');
+      expect(prompt).not.toContain('The Four Phases');
+    }
+  });
 });
