@@ -72,6 +72,20 @@ function readRestartContextFile(filePath: string): RestartContext | null {
   return data;
 }
 
+function isRecoverableInterruptedGroup(
+  group: RestartInterruptedGroup,
+): boolean {
+  return group.status === 'processing';
+}
+
+export function getRecoverableInterruptedGroups(
+  context: Pick<RestartContext, 'interruptedGroups'> | null,
+): RestartInterruptedGroup[] {
+  return (context?.interruptedGroups ?? []).filter(
+    isRecoverableInterruptedGroup,
+  );
+}
+
 function getLatestDistBuildTime(): number | null {
   const distDir = path.join(process.cwd(), 'dist');
   if (!fs.existsSync(distDir)) return null;
@@ -145,7 +159,10 @@ export function writeShutdownRestartContext(
   signal: string,
   serviceIds: string[] = [SERVICE_ID],
 ): string[] {
-  if (interruptedGroups.length === 0) return [];
+  const recoverableInterruptedGroups = interruptedGroups.filter(
+    isRecoverableInterruptedGroup,
+  );
+  if (recoverableInterruptedGroups.length === 0) return [];
 
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const mainChatJid =
@@ -156,8 +173,8 @@ export function writeShutdownRestartContext(
     const filePath = getRestartContextPath(serviceId);
     const existing = readRestartContextFile(filePath);
     const mergedInterrupted = [
-      ...(existing?.interruptedGroups ?? []),
-      ...interruptedGroups,
+      ...getRecoverableInterruptedGroups(existing),
+      ...recoverableInterruptedGroups,
     ].filter(
       (group, index, all) =>
         all.findIndex((candidate) => candidate.chatJid === group.chatJid) ===
@@ -221,8 +238,9 @@ export function consumeRestartContext(): RestartContext | null {
 
 export function buildRestartAnnouncement(context: RestartContext): string {
   const lines = ['재시작 완료.', `- 변경: ${context.summary}`];
-  if (context.interruptedGroups && context.interruptedGroups.length > 0) {
-    lines.push(`- 중단 작업 감지: ${context.interruptedGroups.length}개`);
+  const recoverableInterruptedGroups = getRecoverableInterruptedGroups(context);
+  if (recoverableInterruptedGroups.length > 0) {
+    lines.push(`- 중단 작업 감지: ${recoverableInterruptedGroups.length}개`);
   }
   if (context.verify.length > 0) {
     lines.push(`- 검증: ${context.verify.join(', ')}`);
@@ -240,7 +258,7 @@ export function getInterruptedRecoveryCandidates(
   const seen = new Set<string>();
   const candidates: RestartRecoveryCandidate[] = [];
 
-  for (const interrupted of context.interruptedGroups) {
+  for (const interrupted of getRecoverableInterruptedGroups(context)) {
     if (seen.has(interrupted.chatJid)) continue;
     const group = roomBindings[interrupted.chatJid];
     if (!group) continue;
