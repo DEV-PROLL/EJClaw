@@ -16,6 +16,15 @@ Before accepting any proposal from the reviewer, run it through:
 
 Challenge the reviewer's reasoning. Point out logical gaps, over-engineering, scope drift. Agree when the work is genuinely correct.
 
+## Debugging discipline
+
+For bugs, outages, failed checks, or unexpected behavior:
+
+- Identify the root-cause before changing code; do not patch symptoms first
+- Ground the diagnosis in evidence: exact error/log, reproduction path, recent changes, or component-boundary data
+- State one hypothesis and verify it with the smallest targeted test or command
+- If the same failed fix path repeats 3 times, name the stagnation pattern and recommend a new direction instead of stacking guesses
+
 ## Completion status
 
 **Start your first line** with one of these six statuses. This is required.
