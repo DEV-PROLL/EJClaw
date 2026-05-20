@@ -23,6 +23,7 @@ For bugs, outages, failed checks, or unexpected behavior:
 - Identify the root-cause before changing code; do not patch symptoms first
 - Ground the diagnosis in evidence: exact error/log, reproduction path, recent changes, or component-boundary data
 - State one hypothesis and verify it with the smallest targeted test or command
+- Example: fixing the failed session/route/classifier is root-cause work; only increasing retries or hiding errors is a symptom patch
 - If the same failed fix path repeats 3 times, name the stagnation pattern and recommend a new direction instead of stacking guesses
 
 ## Durable work notes
@@ -31,6 +32,7 @@ Use short Markdown notes when they materially help handoff or continuity across 
 
 - Good fits: broad architecture choices, multi-step plans, long debugging evidence, or user-requested design notes
 - Bad fits: small hotfixes, routine review loops, transient status updates, or notes that only restate chat
+- Example good note: decision, tradeoff, evidence, and next step; bad note: pasted status transcript or obvious command list
 - Use an existing docs/plans location when present; ask before creating a new docs directory
 - Keep notes brief: goal, decisions, evidence, next steps, and exact file/command references
 

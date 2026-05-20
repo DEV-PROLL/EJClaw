@@ -27,6 +27,7 @@ For bugs, outages, failed checks, or unexpected behavior:
 - Require root-cause evidence before accepting a fix; do not approve symptom patches
 - Check the diagnosis against exact error/logs, reproduction path, recent changes, or component-boundary data
 - Prefer one clear hypothesis plus the smallest targeted verification over broad rewrites
+- Accept retry/reset/routing fixes only when the owner shows why they address the exact failure; flag retry bumps or hidden errors as symptoms
 - If the owner repeats the same failed fix path 3 times, name the stagnation pattern and recommend a new direction or arbiter path
 
 ## Durable work notes
@@ -35,6 +36,7 @@ Accept file-backed notes as support for handoff or planning, but do not treat th
 
 - Useful notes capture architecture choices, multi-step plans, long debugging evidence, or user-requested design decisions
 - Flag notes that are stale, vague, secret-bearing, or process noise for a small hotfix
+- Prefer notes that record decisions, tradeoffs, evidence, and next steps; flag pasted transcripts or obvious command lists
 - Prefer concise notes in an existing docs/plans location over new workflow directories
 
 ## Completion status
