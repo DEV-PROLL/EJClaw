@@ -117,6 +117,7 @@ describe('platform-prompts', () => {
       expect(prompt).toContain('## Debugging discipline');
       expect(prompt).toContain('root-cause');
       expect(prompt).toContain('component-boundary data');
+      expect(prompt).toContain('symptom');
       expect(prompt).toContain('same failed fix path');
       expect(prompt).toContain('3 times');
       expect(prompt).not.toContain('superpowers');
@@ -145,8 +146,11 @@ describe('platform-prompts', () => {
       expect(prompt).toContain('multi-step plans');
       expect(prompt).toContain('long debugging evidence');
       expect(prompt).toContain('existing docs/plans location');
+      expect(prompt).toContain('tradeoff');
+      expect(prompt).toContain('pasted');
       expect(prompt).not.toContain('docs/superpowers');
       expect(prompt).not.toContain('Every plan MUST');
+      expect(prompt).not.toContain('Task-size gate');
     }
   });
 });
