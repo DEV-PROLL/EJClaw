@@ -174,6 +174,22 @@ export function _setRoomBindings(
   runtimeState.setRoomBindings(groups);
 }
 
+async function tryDeliverRestartAnnouncement(
+  chatJid: string,
+  rawText: string,
+): Promise<boolean> {
+  try {
+    await deliverFormattedCanonicalMessage(chatJid, rawText);
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err, chatJid },
+      'Skipped restart recovery announcement because no channel is connected',
+    );
+    return false;
+  }
+}
+
 async function announceRestartRecovery(
   processStartedAtMs: number,
 ): Promise<RestartContext | null> {
@@ -188,14 +204,17 @@ async function announceRestartRecovery(
       return explicitContext;
     }
 
-    await deliverFormattedCanonicalMessage(
-      explicitContext.chatJid,
-      buildRestartAnnouncement(explicitContext),
-    );
-    logger.info(
-      { chatJid: explicitContext.chatJid },
-      'Sent explicit restart recovery announcement',
-    );
+    if (
+      await tryDeliverRestartAnnouncement(
+        explicitContext.chatJid,
+        buildRestartAnnouncement(explicitContext),
+      )
+    ) {
+      logger.info(
+        { chatJid: explicitContext.chatJid },
+        'Sent explicit restart recovery announcement',
+      );
+    }
 
     for (const interrupted of getRecoverableInterruptedGroups(
       explicitContext,
@@ -204,7 +223,7 @@ async function announceRestartRecovery(
       if (hasRecentRestartAnnouncement(interrupted.chatJid, dedupeSince)) {
         continue;
       }
-      await deliverFormattedCanonicalMessage(
+      await tryDeliverRestartAnnouncement(
         interrupted.chatJid,
         buildInterruptedRestartAnnouncement(interrupted),
       );
@@ -226,14 +245,17 @@ async function announceRestartRecovery(
     return null;
   }
 
-  await deliverFormattedCanonicalMessage(
-    inferred.chatJid,
-    inferred.lines.join('\n'),
-  );
-  logger.info(
-    { chatJid: inferred.chatJid },
-    'Sent inferred restart recovery announcement',
-  );
+  if (
+    await tryDeliverRestartAnnouncement(
+      inferred.chatJid,
+      inferred.lines.join('\n'),
+    )
+  ) {
+    logger.info(
+      { chatJid: inferred.chatJid },
+      'Sent inferred restart recovery announcement',
+    );
+  }
   return null;
 }
 
