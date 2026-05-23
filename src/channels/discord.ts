@@ -11,7 +11,7 @@ import {
   TextChannel,
 } from 'discord.js';
 
-import { CACHE_DIR, DATA_DIR } from '../config.js';
+import { CACHE_DIR } from '../config.js';
 import { getEnv } from '../env.js';
 import { logger } from '../logger.js';
 import { validateOutboundAttachments } from '../outbound-attachments.js';
@@ -27,10 +27,10 @@ import {
   deleteOwnDashboardDuplicateOnCreate,
   isDashboardTrackedSend,
 } from './discord-dashboard-create-cleanup.js';
+import { describeDownloadedAttachment } from './discord-attachments.js';
 import { deleteRecentDiscordMessagesByContent } from './discord-message-cleanup.js';
 import { prepareDiscordOutbound } from './discord-outbound.js';
 
-const ATTACHMENTS_DIR = path.join(DATA_DIR, 'attachments');
 const TRANSCRIPTION_CACHE_DIR = path.join(CACHE_DIR, 'transcriptions');
 const DISCORD_OWNER_CHANNEL = 'discord';
 const DISCORD_REVIEWER_CHANNEL = 'discord-review';
@@ -38,27 +38,6 @@ const DISCORD_ARBITER_CHANNEL = 'discord-arbiter';
 const DISCORD_OWNER_TOKEN_KEY = 'DISCORD_OWNER_BOT_TOKEN';
 const DISCORD_REVIEWER_TOKEN_KEY = 'DISCORD_REVIEWER_BOT_TOKEN';
 const DISCORD_ARBITER_TOKEN_KEY = 'DISCORD_ARBITER_BOT_TOKEN';
-
-/**
- * Download a Discord attachment to local disk.
- * Returns the absolute path to the saved file.
- */
-async function downloadAttachment(
-  att: Attachment,
-  defaultExt = '.bin',
-): Promise<string> {
-  const res = await fetch(att.url);
-  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-
-  fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
-  const ext = path.extname(att.name || `file${defaultExt}`) || defaultExt;
-  const filename = `${Date.now()}-${att.id}${ext}`;
-  const filePath = path.join(ATTACHMENTS_DIR, filename);
-  fs.writeFileSync(filePath, buffer);
-  logger.info({ file: filename, size: buffer.length }, 'Attachment downloaded');
-  return filePath;
-}
 
 /**
  * Wait for a pending transcription from the other service (poll cache file).
@@ -295,63 +274,32 @@ export class DiscordChannel implements Channel {
       const attachmentDescriptions = await Promise.all(
         [...message.attachments.values()].map(async (att) => {
           const contentType = att.contentType || '';
-          // Voice messages → transcribe; regular audio files → download
+          // Voice messages → transcribe; all attachments still get a file path.
           if (
             contentType.startsWith('audio/') &&
             (isVoiceMessage || att.duration != null)
           ) {
-            return transcribeAudio(att);
-          } else if (
-            contentType.startsWith('audio/') ||
-            contentType.startsWith('image/')
-          ) {
             try {
-              const filePath = await downloadAttachment(
+              const transcript = await transcribeAudio(att);
+              const reference = await describeDownloadedAttachment(
                 att,
-                contentType.startsWith('image/') ? '.png' : '.wav',
+                contentType,
               );
-              const label = contentType.startsWith('image/')
-                ? 'Image'
-                : 'Audio';
-              const origName = att.name || 'file';
-              return `[${label}: ${origName} → ${filePath}]`;
+              return `${transcript}\n${reference}`;
             } catch (err) {
               logger.error(
                 { err, file: att.name },
-                'Attachment download failed',
+                'Voice attachment handling failed',
               );
               return `[File: ${att.name || 'file'} (download failed)]`;
             }
-          } else if (contentType.startsWith('video/')) {
-            return `[Video: ${att.name || 'video'}]`;
-          } else if (
-            contentType.startsWith('text/') ||
-            /\.(txt|md|json|csv|log|xml|yaml|yml|toml|ini|cfg|conf|sh|bash|zsh|py|js|ts|jsx|tsx|html|css|sql|rs|go|java|c|cpp|h|hpp|rb|php|swift|kt|scala|r|lua|pl|ex|exs|hs|ml|clj|dart|v|zig|nim|ps1|bat|cmd|mjs|cjs)$/i.test(
-              att.name || '',
-            )
-          ) {
-            // Download and inline text-based files
-            try {
-              const res = await fetch(att.url);
-              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-              let text = await res.text();
-              // Truncate very large files
-              const MAX_TEXT_LENGTH = 32_000;
-              if (text.length > MAX_TEXT_LENGTH) {
-                text =
-                  text.slice(0, MAX_TEXT_LENGTH) +
-                  `\n...(truncated, ${text.length} chars total)`;
-              }
-              return `[File: ${att.name}]\n${text}`;
-            } catch (err) {
-              logger.error(
-                { err, file: att.name },
-                'Text file download failed',
-              );
-              return `[File: ${att.name || 'file'} (download failed)]`;
-            }
-          } else {
-            return `[File: ${att.name || 'file'}]`;
+          }
+
+          try {
+            return await describeDownloadedAttachment(att, contentType);
+          } catch (err) {
+            logger.error({ err, file: att.name }, 'Attachment download failed');
+            return `[File: ${att.name || 'file'} (download failed)]`;
           }
         }),
       );
