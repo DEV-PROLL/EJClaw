@@ -604,7 +604,10 @@ describe('attachments', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+        arrayBuffer: () =>
+          Promise.resolve(
+            new TextEncoder().encode('Hello from text file').buffer,
+          ),
         text: () => Promise.resolve('Hello from text file'),
       }),
     );
@@ -645,13 +648,21 @@ describe('attachments', () => {
     );
   });
 
-  it('stores video attachment with placeholder', async () => {
+  it('stores video attachment with local path', async () => {
     const opts = createTestOpts();
     const channel = new DiscordChannel('test-token', opts);
     await channel.connect();
 
     const attachments = new Map([
-      ['att1', { name: 'clip.mp4', contentType: 'video/mp4' }],
+      [
+        'att1',
+        {
+          id: 'att1',
+          name: 'clip.mp4',
+          contentType: 'video/mp4',
+          url: 'https://cdn.example.com/clip.mp4',
+        },
+      ],
     ]);
     const msg = createMessage({
       content: '',
@@ -663,18 +674,26 @@ describe('attachments', () => {
     expect(opts.onMessage).toHaveBeenCalledWith(
       'dc:1234567890123456',
       expect.objectContaining({
-        content: '[Video: clip.mp4]',
+        content: expect.stringMatching(/^\[Video: clip\.mp4 → .+\.mp4\]$/),
       }),
     );
   });
 
-  it('stores file attachment with placeholder', async () => {
+  it('stores file attachment with local path', async () => {
     const opts = createTestOpts();
     const channel = new DiscordChannel('test-token', opts);
     await channel.connect();
 
     const attachments = new Map([
-      ['att1', { name: 'report.pdf', contentType: 'application/pdf' }],
+      [
+        'att1',
+        {
+          id: 'att1',
+          name: 'report.pdf',
+          contentType: 'application/pdf',
+          url: 'https://cdn.example.com/report.pdf',
+        },
+      ],
     ]);
     const msg = createMessage({
       content: '',
@@ -686,7 +705,74 @@ describe('attachments', () => {
     expect(opts.onMessage).toHaveBeenCalledWith(
       'dc:1234567890123456',
       expect.objectContaining({
-        content: '[File: report.pdf]',
+        content: expect.stringMatching(/^\[File: report\.pdf → .+\.pdf\]$/),
+      }),
+    );
+  });
+
+  it('stores zip attachment with local path', async () => {
+    const opts = createTestOpts();
+    const channel = new DiscordChannel('test-token', opts);
+    await channel.connect();
+
+    const attachments = new Map([
+      [
+        'att1',
+        {
+          id: 'att1',
+          name: 'display_latency_atopile_rev09.zip',
+          contentType: 'application/zip',
+          url: 'https://cdn.example.com/display_latency_atopile_rev09.zip',
+        },
+      ],
+    ]);
+    const msg = createMessage({
+      content: '',
+      attachments,
+      guildName: 'Server',
+    });
+    await triggerMessage(msg);
+
+    expect(opts.onMessage).toHaveBeenCalledWith(
+      'dc:1234567890123456',
+      expect.objectContaining({
+        content: expect.stringMatching(
+          /^\[File: display_latency_atopile_rev09\.zip → .+\.zip\]$/,
+        ),
+      }),
+    );
+  });
+
+  it('skips oversized file attachments before download', async () => {
+    const opts = createTestOpts();
+    const channel = new DiscordChannel('test-token', opts);
+    await channel.connect();
+
+    const attachments = new Map([
+      [
+        'att1',
+        {
+          id: 'att1',
+          name: 'huge.zip',
+          contentType: 'application/zip',
+          size: 51 * 1024 * 1024,
+          url: 'https://cdn.example.com/huge.zip',
+        },
+      ],
+    ]);
+    const msg = createMessage({
+      content: '',
+      attachments,
+      guildName: 'Server',
+    });
+    await triggerMessage(msg);
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(opts.onMessage).toHaveBeenCalledWith(
+      'dc:1234567890123456',
+      expect.objectContaining({
+        content:
+          '[File: huge.zip (too large to download: 51.0 MiB > 50.0 MiB)]',
       }),
     );
   });
@@ -758,7 +844,7 @@ describe('attachments', () => {
       'dc:1234567890123456',
       expect.objectContaining({
         content: expect.stringMatching(
-          /^\[Image: .+\.png\]\n\[File: b\.txt\]\nHello from text file$/,
+          /^\[Image: .+\.png\]\n\[File: b\.txt → .+\.txt\]\nHello from text file$/,
         ),
       }),
     );
