@@ -11,6 +11,8 @@
     "dashboard:build": "vite build --config apps/dashboard/vite.config.ts",
     "dashboard:preview": "vite preview --config apps/dashboard/vite.config.ts",
     "dashboard:ux": "bun scripts/dashboard-ux.ts",
+    "android:build": "cd apps/android && ./gradlew assembleDebug",
+    "android:install": "cd apps/android && ./gradlew installDebug",
     "install:runners": "bun install --frozen-lockfile --cwd runners/shared && bun install --frozen-lockfile --cwd runners/agent-runner && bun install --frozen-lockfile --cwd runners/codex-runner",
     "build:runners": "bun run install:runners && bun run --cwd runners/shared build && bun run --cwd runners/agent-runner build && bun run --cwd runners/codex-runner build",
     "build:all": "bun run build && bun run dashboard:build && bun run build:runners",
