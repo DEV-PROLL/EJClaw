@@ -4,6 +4,10 @@ node_modules/
 # Build output
 dist/
 runners/*/dist/
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
 
 # Local data & auth
 store/
