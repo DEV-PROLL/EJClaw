@@ -218,6 +218,101 @@ describe('workspace package manager helpers', () => {
     expect(execFileSyncMock).not.toHaveBeenCalled();
   });
 
+  it('repairs a stale pnpm self-referential node_modules tree before install', () => {
+    const repoDir = path.join(tempRoot, 'stale-pnpm');
+    fs.mkdirSync(path.join(repoDir, 'node_modules', '.pnpm'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'stale-pnpm',
+        packageManager: 'pnpm@10.11.0',
+        scripts: { test: 'vitest run' },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(repoDir, 'pnpm-lock.yaml'),
+      'lockfileVersion: 9.0\n',
+    );
+    const selfLoopPath = path.join(
+      repoDir,
+      'node_modules',
+      '.pnpm',
+      'node_modules',
+    );
+    fs.symlinkSync(selfLoopPath, selfLoopPath);
+
+    execFileSyncMock.mockImplementation((_file, _args, options) => {
+      const cwd = (options as { cwd: string }).cwd;
+      expect(fs.existsSync(selfLoopPath)).toBe(false);
+      fs.mkdirSync(path.join(cwd, 'node_modules', '.bin'), { recursive: true });
+      fs.writeFileSync(path.join(cwd, 'node_modules', '.bin', 'vitest'), '');
+      return '';
+    });
+
+    const result = ensureWorkspaceDependenciesInstalled(repoDir);
+
+    expect(result).toMatchObject({
+      installed: true,
+      packageManager: 'pnpm',
+      commandText: 'corepack pnpm install --frozen-lockfile',
+    });
+    expect(execFileSyncMock).toHaveBeenCalledTimes(1);
+    expect(hasInstalledNodeModules(repoDir)).toBe(true);
+  });
+
+  it('retries once after pnpm reports an ELOOP install failure', () => {
+    const repoDir = path.join(tempRoot, 'eloop-retry');
+    fs.mkdirSync(repoDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'eloop-retry',
+        packageManager: 'pnpm@10.11.0',
+        scripts: { test: 'vitest run' },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(repoDir, 'pnpm-lock.yaml'),
+      'lockfileVersion: 9.0\n',
+    );
+
+    execFileSyncMock.mockImplementationOnce((_file, _args, options) => {
+      const cwd = (options as { cwd: string }).cwd;
+      fs.mkdirSync(path.join(cwd, 'node_modules', '.pnpm'), {
+        recursive: true,
+      });
+      const selfLoopPath = path.join(
+        cwd,
+        'node_modules',
+        '.pnpm',
+        'node_modules',
+      );
+      fs.symlinkSync(selfLoopPath, selfLoopPath);
+      throw { stderr: 'ELOOP: too many symbolic links encountered' };
+    });
+    execFileSyncMock.mockImplementationOnce((_file, _args, options) => {
+      const cwd = (options as { cwd: string }).cwd;
+      expect(
+        fs.existsSync(path.join(cwd, 'node_modules', '.pnpm', 'node_modules')),
+      ).toBe(false);
+      fs.mkdirSync(path.join(cwd, 'node_modules', '.bin'), { recursive: true });
+      fs.writeFileSync(path.join(cwd, 'node_modules', '.bin', 'vitest'), '');
+      return '';
+    });
+
+    const result = ensureWorkspaceDependenciesInstalled(repoDir);
+
+    expect(result).toMatchObject({
+      installed: true,
+      packageManager: 'pnpm',
+      commandText: 'corepack pnpm install --frozen-lockfile',
+    });
+    expect(execFileSyncMock).toHaveBeenCalledTimes(2);
+    expect(hasInstalledNodeModules(repoDir)).toBe(true);
+  });
+
   it('disables corepack project specs only for lockfile-selected pnpm workspaces under a conflicting ancestor', () => {
     const parentDir = path.join(tempRoot, 'parent');
     fs.mkdirSync(parentDir, { recursive: true });

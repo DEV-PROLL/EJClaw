@@ -226,9 +226,61 @@ function writeInstallFingerprint(
   );
 }
 
+function hasRecoverableSymlinkLoopAt(symlinkPath: string): boolean {
+  let stat: fs.Stats;
+  try {
+    stat = fs.lstatSync(symlinkPath);
+  } catch (error) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'ELOOP'
+    );
+  }
+
+  if (!stat.isSymbolicLink()) {
+    return false;
+  }
+
+  const target = fs.readlinkSync(symlinkPath);
+  const resolvedTarget = path.resolve(path.dirname(symlinkPath), target);
+  if (resolvedTarget === symlinkPath) {
+    return true;
+  }
+
+  try {
+    fs.realpathSync(symlinkPath);
+    return false;
+  } catch (error) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'ELOOP'
+    );
+  }
+}
+
+function hasRecoverableNodeModulesLoop(repoDir: string): boolean {
+  return hasRecoverableSymlinkLoopAt(
+    path.join(repoDir, 'node_modules', '.pnpm', 'node_modules'),
+  );
+}
+
+function removeNodeModulesTree(repoDir: string): void {
+  fs.rmSync(path.join(repoDir, 'node_modules'), {
+    recursive: true,
+    force: true,
+  });
+}
+
 function hasRunnableNodeModulesTree(repoDir: string): boolean {
   const nodeModulesDir = path.join(repoDir, 'node_modules');
   if (!fs.existsSync(nodeModulesDir)) {
+    return false;
+  }
+  if (hasRecoverableNodeModulesLoop(repoDir)) {
     return false;
   }
 
@@ -383,6 +435,42 @@ export function hasInstalledNodeModules(repoDir: string): boolean {
   return readInstallFingerprint(repoDir) === expectedFingerprint;
 }
 
+function getInstallErrorDetail(error: unknown): string {
+  const stderr =
+    typeof error === 'object' &&
+    error !== null &&
+    'stderr' in error &&
+    typeof (error as { stderr?: unknown }).stderr === 'string'
+      ? (error as { stderr: string }).stderr.trim()
+      : '';
+  const stdout =
+    typeof error === 'object' &&
+    error !== null &&
+    'stdout' in error &&
+    typeof (error as { stdout?: unknown }).stdout === 'string'
+      ? (error as { stdout: string }).stdout.trim()
+      : '';
+  return (
+    stderr || stdout || (error instanceof Error ? error.message : String(error))
+  );
+}
+
+function isRecoverableNodeModulesLoopInstallFailure(detail: string): boolean {
+  return /\bELOOP\b|too many symbolic links/i.test(detail);
+}
+
+function runWorkspaceInstallCommand(
+  repoDir: string,
+  command: WorkspaceCommandSpec,
+): void {
+  execFileSync(command.file, command.args, {
+    cwd: repoDir,
+    env: buildWorkspaceCommandEnvironment(repoDir, command.packageManager),
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
 export function ensureWorkspaceDependenciesInstalled(
   repoDir: string,
 ): WorkspaceDependencyInstallResult {
@@ -403,35 +491,29 @@ export function ensureWorkspaceDependenciesInstalled(
     return { installed: false, packageManager };
   }
 
+  if (hasRecoverableNodeModulesLoop(repoDir)) {
+    removeNodeModulesTree(repoDir);
+  }
+
   try {
-    execFileSync(command.file, command.args, {
-      cwd: repoDir,
-      env: buildWorkspaceCommandEnvironment(repoDir, command.packageManager),
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    runWorkspaceInstallCommand(repoDir, command);
   } catch (error) {
-    const stderr =
-      typeof error === 'object' &&
-      error !== null &&
-      'stderr' in error &&
-      typeof (error as { stderr?: unknown }).stderr === 'string'
-        ? (error as { stderr: string }).stderr.trim()
-        : '';
-    const stdout =
-      typeof error === 'object' &&
-      error !== null &&
-      'stdout' in error &&
-      typeof (error as { stdout?: unknown }).stdout === 'string'
-        ? (error as { stdout: string }).stdout.trim()
-        : '';
-    const detail =
-      stderr ||
-      stdout ||
-      (error instanceof Error ? error.message : String(error));
-    throw new Error(
-      `Failed to install workspace dependencies with "${command.commandText}" in ${repoDir}: ${detail}`,
-    );
+    const detail = getInstallErrorDetail(error);
+    if (isRecoverableNodeModulesLoopInstallFailure(detail)) {
+      removeNodeModulesTree(repoDir);
+      try {
+        runWorkspaceInstallCommand(repoDir, command);
+      } catch (retryError) {
+        const retryDetail = getInstallErrorDetail(retryError);
+        throw new Error(
+          `Failed to install workspace dependencies with "${command.commandText}" in ${repoDir} after cleaning node_modules: ${retryDetail}`,
+        );
+      }
+    } else {
+      throw new Error(
+        `Failed to install workspace dependencies with "${command.commandText}" in ${repoDir}: ${detail}`,
+      );
+    }
   }
 
   const fingerprint = computeInstallFingerprint(repoDir);
