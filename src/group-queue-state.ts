@@ -30,6 +30,7 @@ export interface GroupState {
   runPhase: RunPhase;
   runningTaskId: string | null;
   currentRunId: string | null;
+  lastCloseRequest: { runId: string | null; reason: string | null } | null;
   directTerminalDeliveries: Map<string, string>;
   recentDirectTerminalDeliveries: Map<string, Map<string, string>>;
   pendingMessages: boolean;
@@ -52,6 +53,7 @@ export function createGroupState(): GroupState {
     runPhase: 'idle',
     runningTaskId: null,
     currentRunId: null,
+    lastCloseRequest: null,
     directTerminalDeliveries: new Map(),
     recentDirectTerminalDeliveries: new Map(),
     pendingMessages: false,
@@ -139,6 +141,7 @@ export function transitionRunPhase(
 export function resetRunState(state: GroupState, groupJid: string): void {
   state.currentRunId = null;
   state.runningTaskId = null;
+  state.lastCloseRequest = null;
   state.startedAt = null;
   state.process = null;
   state.processName = null;

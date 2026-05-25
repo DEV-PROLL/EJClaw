@@ -204,6 +204,8 @@ export function createExecuteTurn(deps: CreateExecuteTurnDeps): ExecuteTurnFn {
         });
         return ownership.state !== 'inactive';
       },
+      getCloseReason: () =>
+        deps.queue.getCloseReasonForRun?.(chatJid, runId) ?? null,
       deliverFinalText: async (text, options) => {
         try {
           return await deps.deliverFinalText({

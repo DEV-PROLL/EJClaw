@@ -747,3 +747,47 @@ describe('GroupQueue', () => {
     await vi.advanceTimersByTimeAsync(10);
   });
 });
+
+describe('GroupQueue close reason tracking', () => {
+  let queue: GroupQueue;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    queue = new GroupQueue();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('records the close reason for the active message run until it finishes', async () => {
+    const ipcDir = '/tmp/ejclaw-test-data/ipc/group-folder';
+    let releaseRun!: (value: boolean) => void;
+    let activeRunId = '';
+    const blocker = new Promise<boolean>((resolve) => {
+      releaseRun = resolve;
+    });
+
+    queue.setProcessMessagesFn(
+      vi.fn(async (_groupJid: string, context: GroupRunContext) => {
+        activeRunId = context.runId;
+        return await blocker;
+      }),
+    );
+    queue.enqueueMessageCheck('group1@g.us', ipcDir);
+    await vi.advanceTimersByTimeAsync(10);
+
+    queue.closeStdin('group1@g.us', { reason: 'human-message-detected' });
+
+    expect(queue.getCloseReasonForRun('group1@g.us', activeRunId)).toBe(
+      'human-message-detected',
+    );
+    expect(queue.getCloseReasonForRun('group1@g.us', 'other-run')).toBeNull();
+
+    releaseRun(true);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(queue.getCloseReasonForRun('group1@g.us', activeRunId)).toBeNull();
+  });
+});

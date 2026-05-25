@@ -19,11 +19,70 @@ import { resolvePairedFollowUpQueueAction } from './message-agent-executor-rules
 import { enqueuePairedFollowUpAfterEvent } from './message-runtime-follow-up.js';
 import type { PairedTurnIdentity } from './paired-turn-identity.js';
 import { resolvePairedTurnRunOwnership } from './paired-turn-run-ownership.js';
+import { isHumanMessageCloseReason } from './message-close-reasons.js';
 import type { PairedRoomRole } from './types.js';
 
 type ExecutorLog = Pick<typeof logger, 'info' | 'warn'>;
 
 const PAIRED_TASK_EXECUTION_LEASE_HEARTBEAT_MS = 30_000;
+
+type PairedTaskRecord = NonNullable<ReturnType<typeof getPairedTaskById>>;
+
+function releaseInterruptedPairedExecution(
+  taskId: string,
+  runId: string,
+  log: ExecutorLog,
+): void {
+  log.info(
+    { pairedTaskId: taskId, runId },
+    'Released paired execution lease without counting a failure because a human message interrupted the turn',
+  );
+  try {
+    releasePairedTaskExecutionLease({ taskId, runId });
+  } catch (err) {
+    log.warn(
+      { pairedTaskId: taskId, runId, err },
+      'Failed to release paired execution lease after human interruption',
+    );
+  }
+}
+
+function completeStoredExecution(
+  taskId: string,
+  role: PairedRoomRole,
+  status: 'succeeded' | 'failed',
+  runId: string,
+  summary: string | null,
+): void {
+  completePairedExecutionContext({
+    taskId,
+    role,
+    status,
+    runId,
+    summary,
+  });
+}
+
+async function notifyPairedCompletionIfNeeded(args: {
+  task: PairedTaskRecord | null | undefined;
+  chatJid: string;
+  onOutput?: (output: AgentOutput) => Promise<void>;
+}): Promise<void> {
+  if (args.task?.status !== 'completed' || !args.task.completion_reason) return;
+  const sender = getLastHumanMessageSender(args.chatJid);
+  const mention = sender ? `<@${sender}>` : '';
+  const notifications: Record<string, string> = {
+    escalated: `${mention} ⚠️ 자동 해결 불가 — 확인이 필요합니다.`,
+  };
+  const message = notifications[args.task.completion_reason];
+  if (!message) return;
+  await args.onOutput?.({
+    status: 'success',
+    result: message,
+    output: { visibility: 'public', text: message },
+    phase: 'final',
+  });
+}
 
 export interface PairedExecutionLifecycle {
   updateSummary(args: {
@@ -47,6 +106,7 @@ export function createPairedExecutionLifecycle(args: {
   runId: string;
   enqueueMessageCheck: () => void;
   getDirectTerminalDeliveryText?: () => string | null;
+  getCloseReason?: () => string | null;
   onOutput?: (output: AgentOutput) => Promise<void>;
   log: ExecutorLog;
 }): PairedExecutionLifecycle {
@@ -58,6 +118,7 @@ export function createPairedExecutionLifecycle(args: {
     runId,
     enqueueMessageCheck,
     getDirectTerminalDeliveryText,
+    getCloseReason,
     onOutput,
     log,
   } = args;
@@ -76,6 +137,8 @@ export function createPairedExecutionLifecycle(args: {
     pairedExecutionContext?.requiresVisibleVerdict === true;
   const missingVisibleVerdictSummary =
     'Execution completed without a visible terminal verdict.';
+  const wasInterruptedByHumanMessage = (): boolean =>
+    isHumanMessageCloseReason(getCloseReason?.() ?? null);
 
   const currentRunOwnsActiveAttempt = (reason: string): boolean => {
     if (!pairedTurnIdentity) {
@@ -276,6 +339,7 @@ export function createPairedExecutionLifecycle(args: {
     },
 
     recordFinalOutputBeforeDelivery(outputText) {
+      if (wasInterruptedByHumanMessage()) return false;
       if (!currentRunOwnsActiveAttempt('streamed-final-output')) {
         return false;
       }
@@ -376,26 +440,34 @@ export function createPairedExecutionLifecycle(args: {
       const sawOutputForFollowUp = missingVisibleVerdict
         ? false
         : pairedSawOutput;
+      const interruptedByHumanMessage = wasInterruptedByHumanMessage();
 
       if (pairedExecutionContext && !pairedExecutionCompleted) {
-        if (effectiveStatus === 'succeeded') {
-          try {
-            persistPairedTurnOutputIfNeeded();
-          } catch (err) {
-            log.warn(
-              { pairedTaskId: pairedExecutionContext.task.id, err },
-              'Failed to store paired turn output',
-            );
+        if (interruptedByHumanMessage) {
+          releaseInterruptedPairedExecution(
+            pairedExecutionContext.task.id,
+            runId,
+            log,
+          );
+        } else {
+          if (effectiveStatus === 'succeeded') {
+            try {
+              persistPairedTurnOutputIfNeeded();
+            } catch (err) {
+              log.warn(
+                { pairedTaskId: pairedExecutionContext.task.id, err },
+                'Failed to store paired turn output',
+              );
+            }
           }
+          completeStoredExecution(
+            pairedExecutionContext.task.id,
+            completedRole,
+            effectiveStatus,
+            runId,
+            pairedExecutionSummary,
+          );
         }
-
-        completePairedExecutionContext({
-          taskId: pairedExecutionContext.task.id,
-          role: completedRole,
-          status: effectiveStatus,
-          runId,
-          summary: pairedExecutionSummary,
-        });
         pairedExecutionCompleted = true;
       }
 
@@ -407,27 +479,15 @@ export function createPairedExecutionLifecycle(args: {
       if (!pairedExecutionContext) {
         return;
       }
-
-      const finishedTask = getPairedTaskById(pairedExecutionContext.task.id);
-      if (
-        finishedTask?.status === 'completed' &&
-        finishedTask.completion_reason
-      ) {
-        const sender = getLastHumanMessageSender(chatJid);
-        const mention = sender ? `<@${sender}>` : '';
-        const notifications: Record<string, string> = {
-          escalated: `${mention} ⚠️ 자동 해결 불가 — 확인이 필요합니다.`,
-        };
-        const message = notifications[finishedTask.completion_reason];
-        if (message) {
-          await onOutput?.({
-            status: 'success',
-            result: message,
-            output: { visibility: 'public', text: message },
-            phase: 'final',
-          });
-        }
+      if (interruptedByHumanMessage) {
+        return;
       }
+      const finishedTask = getPairedTaskById(pairedExecutionContext.task.id);
+      await notifyPairedCompletionIfNeeded({
+        task: finishedTask,
+        chatJid,
+        onOutput,
+      });
 
       const queueAction =
         directTerminalOutput &&

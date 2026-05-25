@@ -9,6 +9,7 @@ import { shouldResetSessionOnAgentFailure } from './session-recovery.js';
 import { TASK_STATUS_MESSAGE_PREFIX } from './task-watch-status.js';
 import { formatElapsedKorean } from './utils.js';
 import type { PairedTurnIdentity } from './paired-turn-identity.js';
+import { isHumanMessageCloseReason } from './message-close-reasons.js';
 import {
   normalizeAgentOutputPhase,
   toVisiblePhase,
@@ -45,6 +46,7 @@ interface MessageTurnControllerOptions {
     },
   ) => Promise<boolean>;
   canDeliverFinalText?: () => boolean;
+  getCloseReason?: () => string | null;
   allowProgressReplayWithoutFinal?: boolean;
   deliveryRole?: PairedRoomRole | null;
   deliveryServiceId?: string | null;
@@ -350,11 +352,9 @@ export class MessageTurnController {
     visiblePhase: VisiblePhase;
   }> {
     await this.deactivateTyping('turn:finish', { outputStatus });
-
     if (outputStatus === 'error') {
       this.hadError = true;
     }
-
     if (
       outputStatus === 'success' &&
       this.visiblePhase === 'progress' &&
@@ -362,7 +362,9 @@ export class MessageTurnController {
       this.latestProgressTextForFinal
     ) {
       const replayText = this.latestProgressTextForFinal;
-      if (this.options.allowProgressReplayWithoutFinal !== false) {
+      if (isHumanMessageCloseReason(this.options.getCloseReason?.() ?? null)) {
+        this.resetProgressState();
+      } else if (this.options.allowProgressReplayWithoutFinal !== false) {
         this.log.info(
           'Sending a separate final message from the last progress output after agent completion',
         );
@@ -787,13 +789,11 @@ export class MessageTurnController {
     }
     await this.publishTerminalText(this.options.failureFinalText);
   }
-
   private requestAgentClose(reason: string): void {
     if (this.closeRequested) return;
     this.closeRequested = true;
     this.options.requestClose(reason);
   }
-
   private async sendProgressMessage(text: string): Promise<void> {
     if (
       this.options.canDeliverFinalText &&

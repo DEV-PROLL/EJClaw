@@ -322,7 +322,10 @@ export class GroupQueue {
     }
     return state.directTerminalDeliveries.get(senderRole) ?? null;
   }
-
+  getCloseReasonForRun(groupJid: string, runId: string): string | null {
+    const closeRequest = this.getGroup(groupJid).lastCloseRequest;
+    return closeRequest?.runId === runId ? closeRequest.reason : null;
+  }
   hasRecordedDirectTerminalDeliveryForRun(
     groupJid: string,
     runId: string,
@@ -342,7 +345,6 @@ export class GroupQueue {
       state.recentDirectTerminalDeliveries.get(runId)?.has(senderRole) ?? false
     );
   }
-
   private clearPostCloseTimers(state: GroupState): void {
     if (state.postCloseTermTimer) {
       clearTimeout(state.postCloseTermTimer);
@@ -428,29 +430,27 @@ export class GroupQueue {
     }, POST_CLOSE_SIGKILL_DELAY_MS);
   }
 
-  /**
-   * Signal the active agent process to wind down by writing a close sentinel.
-   */
   closeStdin(
     groupJid: string,
     metadata?: { runId?: string; reason?: string },
   ): void {
     const state = this.getGroup(groupJid);
     if (state.runPhase === 'idle' || !state.ipcDir) return;
+    const runId = metadata?.runId ?? state.currentRunId;
+    state.lastCloseRequest = { runId, reason: metadata?.reason ?? null };
     if (state.runPhase === 'running_messages') {
       transitionRunPhase(state, groupJid, 'closing_messages', {
         reason: metadata?.reason,
-        runId: metadata?.runId ?? state.currentRunId,
+        runId,
       });
       assertRunPhaseInvariants(state, groupJid);
     }
-
     try {
       writeCloseSentinel(state.ipcDir);
       logger.info(
         {
           groupJid,
-          runId: metadata?.runId ?? state.currentRunId,
+          runId,
           ipcDir: state.ipcDir,
           reason: metadata?.reason ?? 'unspecified',
         },
@@ -460,7 +460,7 @@ export class GroupQueue {
       logger.warn(
         {
           groupJid,
-          runId: metadata?.runId ?? state.currentRunId,
+          runId,
           ipcDir: state.ipcDir,
           reason: metadata?.reason ?? 'unspecified',
           err,
