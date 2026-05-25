@@ -92,7 +92,12 @@ async function enrichArbiterPromptWithMoa(args: {
 export interface MessageAgentExecutorDeps {
   assistantName: string;
   queue: Pick<GroupQueue, 'registerProcess' | 'enqueueMessageCheck'> &
-    Partial<Pick<GroupQueue, 'getDirectTerminalDeliveryForRun'>>;
+    Partial<
+      Pick<
+        GroupQueue,
+        'getDirectTerminalDeliveryForRun' | 'getCloseReasonForRun'
+      >
+    >;
   getRoomBindings: () => Record<string, RegisteredGroup>;
   getSessions: () => Record<string, string>;
   persistSession: (groupFolder: string, sessionId: string) => void;
@@ -180,6 +185,8 @@ export async function runAgentForGroup(
         runId,
         runtimePairedTurnIdentity?.role ?? activeRole,
       ) ?? null,
+    getCloseReason: () =>
+      deps.queue.getCloseReasonForRun?.(chatJid, runId) ?? null,
     onOutput,
     log,
   });

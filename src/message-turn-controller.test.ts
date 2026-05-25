@@ -803,3 +803,53 @@ describe('MessageTurnController outbound audit logging', () => {
     });
   });
 });
+
+describe('MessageTurnController human interruptions', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('does not replay owner progress as final when a human message interrupted the turn', async () => {
+    const channel = { ...makeChannel(), name: 'discord' } satisfies Channel;
+    const deliverFinalText = vi.fn().mockResolvedValue(true);
+    const controller = new MessageTurnController({
+      chatJid: 'dc:test-room',
+      group: makeGroup(),
+      runId: 'run-owner-human-interrupted',
+      channel,
+      idleTimeout: 1_000,
+      failureFinalText: '실패',
+      isClaudeCodeAgent: true,
+      clearSession: vi.fn(),
+      requestClose: vi.fn(),
+      deliverFinalText,
+      getCloseReason: () => 'human-message-detected',
+      deliveryRole: 'owner',
+      pairedTurnIdentity: {
+        turnId: 'task-1:2026-04-10T14:22:00.000Z:owner-turn',
+        taskId: 'task-1',
+        taskUpdatedAt: '2026-04-10T14:22:00.000Z',
+        intentKind: 'owner-turn',
+        role: 'owner',
+      },
+    });
+
+    await controller.start();
+    await controller.handleOutput({
+      status: 'success',
+      phase: 'progress',
+      result: '아비터 판단을 내리겠습니다.',
+    } as any);
+    await controller.handleOutput({
+      status: 'success',
+      phase: 'progress',
+      result: '추가 확인 중입니다.',
+    } as any);
+    await flushAsync();
+
+    await controller.finish('success');
+
+    expect(channel.sendAndTrack).toHaveBeenCalledTimes(1);
+    expect(deliverFinalText).not.toHaveBeenCalled();
+  });
+});

@@ -25,6 +25,7 @@ vi.mock('./message-runtime-follow-up.js', () => ({
 
 import type { AgentOutput } from './agent-runner.js';
 import * as db from './db.js';
+import * as pairedExecutionContextModule from './paired-execution-context.js';
 import { createPairedExecutionLifecycle } from './message-agent-executor-paired.js';
 
 const log = {
@@ -108,5 +109,95 @@ describe('createPairedExecutionLifecycle', () => {
     await lifecycle.asyncFinalize();
 
     expect(outputs).toEqual([]);
+  });
+
+  it('releases an owner turn interrupted by a human message without counting an owner failure', async () => {
+    const enqueueMessageCheck = vi.fn();
+    vi.mocked(db.getPairedTaskById).mockReturnValue({
+      id: 'paired-task-human-interrupted',
+      chat_jid: 'group@test',
+      group_folder: 'test-group',
+      owner_service_id: 'claude',
+      reviewer_service_id: 'codex-main',
+      title: null,
+      source_ref: 'HEAD',
+      plan_notes: null,
+      round_trip_count: 1,
+      review_requested_at: '2026-04-09T00:00:00.000Z',
+      status: 'active',
+      arbiter_verdict: null,
+      arbiter_requested_at: null,
+      completion_reason: null,
+      created_at: '2026-04-09T00:00:00.000Z',
+      updated_at: '2026-04-09T00:00:01.000Z',
+    });
+
+    const lifecycle = createPairedExecutionLifecycle({
+      pairedExecutionContext: {
+        task: {
+          id: 'paired-task-human-interrupted',
+          chat_jid: 'group@test',
+          group_folder: 'test-group',
+          owner_service_id: 'claude',
+          reviewer_service_id: 'codex-main',
+          title: null,
+          source_ref: 'HEAD',
+          plan_notes: null,
+          round_trip_count: 1,
+          review_requested_at: '2026-04-09T00:00:00.000Z',
+          status: 'active',
+          arbiter_verdict: null,
+          arbiter_requested_at: null,
+          completion_reason: null,
+          created_at: '2026-04-09T00:00:00.000Z',
+          updated_at: '2026-04-09T00:00:00.000Z',
+        },
+        workspace: null,
+        envOverrides: {},
+      },
+      pairedTurnIdentity: {
+        turnId:
+          'paired-task-human-interrupted:2026-04-09T00:00:00.000Z:owner-turn',
+        taskId: 'paired-task-human-interrupted',
+        taskUpdatedAt: '2026-04-09T00:00:00.000Z',
+        intentKind: 'owner-turn',
+        role: 'owner',
+      },
+      completedRole: 'owner',
+      chatJid: 'group@test',
+      runId: 'run-human-interrupted',
+      enqueueMessageCheck,
+      getCloseReason: () => 'human-message-detected',
+      log,
+    });
+
+    expect(
+      lifecycle.recordFinalOutputBeforeDelivery(
+        'TASK_DONE\n부분 진행 결과를 닫기 전에 내보냅니다.',
+      ),
+    ).toBe(false);
+    lifecycle.updateSummary({
+      outputText: '아비터 판단을 내리겠습니다.',
+    });
+    lifecycle.markStatus('succeeded');
+    lifecycle.markSawOutput(false);
+    await lifecycle.asyncFinalize();
+
+    expect(
+      pairedExecutionContextModule.completePairedExecutionContext,
+    ).not.toHaveBeenCalled();
+    expect(db.insertPairedTurnOutput).not.toHaveBeenCalled();
+    expect(db.releasePairedTaskExecutionLease).toHaveBeenCalledWith({
+      taskId: 'paired-task-human-interrupted',
+      runId: 'run-human-interrupted',
+    });
+    expect(db.failPairedTurn).toHaveBeenCalledWith({
+      turnIdentity: expect.objectContaining({
+        taskId: 'paired-task-human-interrupted',
+        role: 'owner',
+      }),
+      error: '아비터 판단을 내리겠습니다.',
+    });
+    expect(enqueueMessageCheck).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import {
   buildQueuedTurnDispatch,
   executeBotOnlyPairedFollowUpAction,
 } from './message-runtime-flow.js';
+import { HUMAN_MESSAGE_DETECTED_CLOSE_REASON } from './message-close-reasons.js';
 import {
   advanceLastAgentCursor,
   filterLoopingPairedBotMessages,
@@ -305,7 +306,7 @@ export async function processLoopGroupMessages(args: {
   if (hasExternalHumanMessage(processableGroupMessages)) {
     const interruptedActiveRun = args.isRunningMessageTurn(chatJid);
     if (interruptedActiveRun) {
-      args.closeStdin('human-message-detected');
+      args.closeStdin(HUMAN_MESSAGE_DETECTED_CLOSE_REASON);
     }
     args.enqueueMessageCheck();
     logger.info(
