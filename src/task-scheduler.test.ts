@@ -1741,6 +1741,60 @@ Check the run.
     expect(updatedTask?.status_started_at).toBe('2026-03-19T07:00:00.000Z');
   });
 
+  it('sends a fresh watcher status message when the watcher completes', async () => {
+    vi.setSystemTime(new Date('2026-03-19T07:05:00.000Z'));
+    createTask({
+      id: 'task-watch-status-completed',
+      group_folder: 'test-group',
+      chat_jid: 'shared@g.us',
+      agent_type: 'codex',
+      prompt: `
+[BACKGROUND CI WATCH]
+
+Watch target:
+PR #77 checks
+
+Check instructions:
+Check the run.
+      `.trim(),
+      schedule_type: 'interval',
+      schedule_value: '60000',
+      context_mode: 'isolated',
+      next_run: new Date(Date.now() - 60_000).toISOString(),
+      status: 'active',
+      status_message_id: 'msg-old',
+      status_started_at: '2026-03-19T07:00:00.000Z',
+      created_at: '2026-03-19T07:00:00.000Z',
+    });
+
+    const sendTrackedMessage = vi.fn(async () => 'msg-terminal');
+    const editTrackedMessage = vi.fn(async () => {});
+
+    const tracker = createTaskStatusTracker(
+      getTaskById('task-watch-status-completed')!,
+      {
+        sendTrackedMessage,
+        editTrackedMessage,
+      },
+    );
+
+    await tracker.update('completed');
+
+    expect(editTrackedMessage).not.toHaveBeenCalled();
+    expect(sendTrackedMessage).toHaveBeenCalledWith(
+      'shared@g.us',
+      expect.stringContaining(`${TASK_STATUS_MESSAGE_PREFIX}CI 감시 종료:`),
+    );
+    expect(sendTrackedMessage).toHaveBeenCalledWith(
+      'shared@g.us',
+      expect.stringContaining('- 상태: 완료'),
+    );
+
+    const updatedTask = getTaskById('task-watch-status-completed');
+    expect(updatedTask?.status_message_id).toBe('msg-terminal');
+    expect(updatedTask?.status_started_at).toBe('2026-03-19T07:00:00.000Z');
+  });
+
   it('computeNextRun anchors interval tasks to scheduled time to prevent drift', () => {
     const scheduledTime = new Date(Date.now() - 2000).toISOString(); // 2s ago
     const task = {
