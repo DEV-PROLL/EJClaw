@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildArbiterPromptForTask,
   buildFinalizePendingPrompt,
   buildOwnerPendingPrompt,
   buildPairedTurnPrompt,
   buildReviewerPendingPrompt,
 } from './message-runtime-prompts.js';
-import type { NewMessage, PairedTurnOutput } from './types.js';
+import type { NewMessage, PairedTask, PairedTurnOutput } from './types.js';
 
 const CARRY_FORWARD_MARKER =
   '[Carried forward context from the previous task: latest owner final]';
@@ -27,6 +28,7 @@ function makeHumanMessage(content: string): NewMessage {
 function makeTurnOutput(
   outputText: string,
   role: PairedTurnOutput['role'] = 'owner',
+  overrides: Partial<PairedTurnOutput> = {},
 ): PairedTurnOutput {
   return {
     id: 1,
@@ -35,6 +37,37 @@ function makeTurnOutput(
     role,
     output_text: outputText,
     created_at: '2026-04-20T00:59:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeTask(overrides: Partial<PairedTask> = {}): PairedTask {
+  return {
+    id: 'task-1',
+    chat_jid: 'group@test',
+    group_folder: 'group',
+    owner_service_id: 'codex-main',
+    reviewer_service_id: 'claude',
+    owner_agent_type: 'codex',
+    reviewer_agent_type: 'claude-code',
+    arbiter_agent_type: 'codex',
+    title: null,
+    source_ref: null,
+    plan_notes: null,
+    review_requested_at: null,
+    round_trip_count: 1,
+    owner_failure_count: 0,
+    owner_step_done_streak: 0,
+    finalize_step_done_count: 0,
+    task_done_then_user_reopen_count: 0,
+    empty_step_done_streak: 0,
+    status: 'review_ready',
+    arbiter_verdict: null,
+    arbiter_requested_at: null,
+    completion_reason: null,
+    created_at: '2026-04-20T00:58:00.000Z',
+    updated_at: '2026-04-20T00:59:00.000Z',
+    ...overrides,
   };
 }
 
@@ -79,6 +112,26 @@ describe('message-runtime-prompts carry-forward guidance', () => {
     );
   });
 
+  it('keeps reviewer pending prompts output-only when current task outputs exist', () => {
+    const prompt = buildReviewerPendingPrompt({
+      chatJid: 'group@test',
+      timezone: 'UTC',
+      turnOutputs: [
+        makeTurnOutput('TASK_DONE\n현재 owner 결과', 'owner', {
+          turn_number: 1,
+          created_at: '2026-04-20T02:00:00.000Z',
+        }),
+      ],
+      recentHumanMessages: [
+        makeHumanMessage('과거 요청을 다시 기준으로 보면 안 됨'),
+      ],
+      lastHumanMessage: '과거 요청을 다시 기준으로 보면 안 됨',
+    });
+
+    expect(prompt).toContain('현재 owner 결과');
+    expect(prompt).not.toContain('과거 요청을 다시 기준으로 보면 안 됨');
+  });
+
   it('prepends a carry-forward warning to owner pending prompts', () => {
     const prompt = buildOwnerPendingPrompt({
       chatJid: 'group@test',
@@ -95,6 +148,75 @@ describe('message-runtime-prompts carry-forward guidance', () => {
     ).toBe(true);
     expect(prompt).toContain(
       'Respond only to the latest human request and the current task.',
+    );
+  });
+
+  it('keeps owner pending prompts output-only when reviewer feedback exists', () => {
+    const prompt = buildOwnerPendingPrompt({
+      chatJid: 'group@test',
+      timezone: 'UTC',
+      turnOutputs: [
+        makeTurnOutput('TASK_DONE\n현재 owner 결과', 'owner', {
+          turn_number: 1,
+        }),
+        makeTurnOutput('DONE_WITH_CONCERNS\n현재 reviewer 피드백', 'reviewer', {
+          id: 2,
+          turn_number: 2,
+        }),
+      ],
+      recentHumanMessages: [makeHumanMessage('이전 작업의 사용자 메시지')],
+      lastHumanMessage: '이전 작업의 사용자 메시지',
+    });
+
+    expect(prompt).toContain('현재 owner 결과');
+    expect(prompt).toContain('현재 reviewer 피드백');
+    expect(prompt).not.toContain('이전 작업의 사용자 메시지');
+  });
+
+  it('keeps arbiter prompts output-only when turn outputs exist', () => {
+    const prompt = buildArbiterPromptForTask({
+      task: makeTask({ status: 'arbiter_requested' }),
+      chatJid: 'group@test',
+      timezone: 'UTC',
+      turnOutputs: [
+        makeTurnOutput('TASK_DONE\nowner 주장', 'owner', {
+          turn_number: 1,
+        }),
+        makeTurnOutput('DONE_WITH_CONCERNS\nreviewer 반박', 'reviewer', {
+          id: 2,
+          turn_number: 2,
+        }),
+      ],
+      recentMessages: [makeHumanMessage('예전 유저 지시')],
+      labeledRecentMessages: [makeHumanMessage('예전 유저 지시')],
+    });
+
+    expect(prompt).toContain('owner 주장');
+    expect(prompt).toContain('reviewer 반박');
+    expect(prompt).not.toContain('예전 유저 지시');
+  });
+
+  it('preserves turn output order instead of timestamp interleaving', () => {
+    const prompt = buildReviewerPendingPrompt({
+      chatJid: 'group@test',
+      timezone: 'UTC',
+      turnOutputs: [
+        makeTurnOutput('owner output first', 'owner', {
+          turn_number: 1,
+          created_at: '2026-04-20T02:00:00.000Z',
+        }),
+        makeTurnOutput('reviewer output second', 'reviewer', {
+          id: 2,
+          turn_number: 2,
+          created_at: '2026-04-20T01:00:00.000Z',
+        }),
+      ],
+      recentHumanMessages: [],
+      lastHumanMessage: null,
+    });
+
+    expect(prompt.indexOf('owner output first')).toBeLessThan(
+      prompt.indexOf('reviewer output second'),
     );
   });
 

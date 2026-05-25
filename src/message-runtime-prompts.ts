@@ -79,6 +79,17 @@ export function buildPairedTurnPrompt(args: {
   );
 }
 
+function turnOutputsOnlyPrompt(
+  chatJid: string,
+  timezone: string,
+  turnOutputs: PairedTurnOutput[],
+): string {
+  return prependCarriedForwardGuidance(
+    formatMessages(turnOutputsToMessages(turnOutputs, chatJid), timezone),
+    turnOutputs,
+  );
+}
+
 export function buildReviewerPendingPrompt(args: {
   chatJid: string;
   timezone: string;
@@ -87,17 +98,7 @@ export function buildReviewerPendingPrompt(args: {
   lastHumanMessage: string | null | undefined;
 }): string {
   if (args.turnOutputs.length > 0) {
-    return prependCarriedForwardGuidance(
-      formatMessages(
-        mergeHumanAndTurnOutputMessages(
-          args.chatJid,
-          args.recentHumanMessages,
-          args.turnOutputs,
-        ),
-        args.timezone,
-      ),
-      args.turnOutputs,
-    );
+    return turnOutputsOnlyPrompt(args.chatJid, args.timezone, args.turnOutputs);
   }
 
   if (!args.lastHumanMessage) {
@@ -115,17 +116,7 @@ export function buildOwnerPendingPrompt(args: {
   lastHumanMessage: string | null | undefined;
 }): string {
   if (args.turnOutputs.length > 0) {
-    return prependCarriedForwardGuidance(
-      formatMessages(
-        mergeHumanAndTurnOutputMessages(
-          args.chatJid,
-          args.recentHumanMessages,
-          args.turnOutputs,
-        ),
-        args.timezone,
-      ),
-      args.turnOutputs,
-    );
+    return turnOutputsOnlyPrompt(args.chatJid, args.timezone, args.turnOutputs);
   }
 
   if (!args.lastHumanMessage) {
@@ -145,11 +136,7 @@ export function buildArbiterPromptForTask(args: {
 }): string {
   const messages =
     args.turnOutputs.length > 0
-      ? mergeHumanAndTurnOutputMessages(
-          args.chatJid,
-          args.recentMessages.filter((message) => !message.is_bot_message),
-          args.turnOutputs,
-        )
+      ? turnOutputsToMessages(args.turnOutputs, args.chatJid)
       : args.labeledRecentMessages;
 
   return buildArbiterContextPrompt({
