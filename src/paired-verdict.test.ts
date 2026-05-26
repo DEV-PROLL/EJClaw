@@ -6,7 +6,7 @@ import {
 } from './paired-verdict.js';
 
 describe('paired verdict parser', () => {
-  it('parses visible verdicts from the first summary line only', () => {
+  it('parses visible verdicts from leading summary lines', () => {
     expect(parseVisibleVerdict('STEP_DONE\nmore to do')).toBe('step_done');
     expect(parseVisibleVerdict('TASK_DONE\nall done')).toBe('task_done');
     expect(
@@ -16,6 +16,46 @@ describe('paired verdict parser', () => {
     ).toBe('done_with_concerns');
     expect(parseVisibleVerdict('BLOCKED\nextra detail')).toBe('blocked');
     expect(parseVisibleVerdict('random prose')).toBe('continue');
+  });
+
+  it('accepts status tokens a few visible lines into the summary', () => {
+    expect(
+      parseVisibleVerdict(
+        [
+          '판단부터 적겠습니다.',
+          '검증 결과는 아래와 같습니다.',
+          'STEP_DONE',
+          '',
+          '나머지 설명입니다.',
+        ].join('\n'),
+      ),
+    ).toBe('step_done');
+  });
+
+  it('ignores status tokens in prose or code fences', () => {
+    expect(
+      parseVisibleVerdict('검토 결과 STEP_DONE으로 보입니다.\n세부 내용'),
+    ).toBe('continue');
+    expect(
+      parseVisibleVerdict(
+        ['```text', 'TASK_DONE', '```', '본문에는 상태가 없습니다.'].join('\n'),
+      ),
+    ).toBe('continue');
+  });
+
+  it('does not scan beyond the leading visible line window', () => {
+    expect(
+      parseVisibleVerdict(
+        [
+          '첫 줄',
+          '둘째 줄',
+          '셋째 줄',
+          '넷째 줄',
+          '다섯째 줄',
+          'TASK_DONE',
+        ].join('\n'),
+      ),
+    ).toBe('continue');
   });
 
   it('classifies arbiter verdicts from the first visible line', () => {
