@@ -5,12 +5,12 @@ Use it to acknowledge a request before starting longer work.
 
 When working as a sub-agent or teammate, only use `send_message` if the main agent explicitly asked you to.
 
-## Image attachments
+## Media attachments
 
-When a locally generated image or screenshot should appear in Discord, include a Markdown image with an absolute local path:
+When a locally generated image, screenshot, video, audio, or document should appear in Discord, include a `MEDIA:` directive on its own line with an absolute local path:
 
 ```text
-![screenshot](/absolute/path/screenshot.png)
+MEDIA:/absolute/path/preview.mp4
 ```
 
-You may also use `[Image: /absolute/path/screenshot.png]` when that is shorter. Use absolute local paths only, do not repeat the same path in the visible text, and only attach raster image files: PNG, JPEG, GIF, WebP, and BMP. SVG is not accepted.
+`MEDIA:` lines are hidden from the visible message and uploaded as native Discord attachments. Use absolute local paths only, do not repeat the same path in the visible text, and do not use generic markdown links or plain file paths as attachment directives. Supported formats include PNG, JPEG, GIF, WebP, BMP, MP4, MOV, WebM, MP3, WAV, OGG, M4A, FLAC, PDF, ZIP, TXT, Markdown, CSV, and JSON. SVG is not accepted.

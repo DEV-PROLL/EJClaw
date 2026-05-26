@@ -4,6 +4,7 @@ export {
 } from './room-role-context.js';
 export {
   extractMarkdownImageAttachments,
+  extractMediaAttachments,
   extractImageTagPaths,
   IMAGE_TAG_RE,
   IPC_CLOSE_SENTINEL,

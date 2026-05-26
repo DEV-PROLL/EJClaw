@@ -102,6 +102,10 @@ const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
   'base64',
 );
+const MINIMAL_MP4 = Buffer.from([
+  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00,
+  0x00, 0x02, 0x00, 0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32,
+]);
 
 const tempFiles: string[] = [];
 
@@ -256,6 +260,39 @@ ${JSON.stringify({
       ],
       flags: 1 << 2,
     });
+  });
+
+  it('normalizes MEDIA directives and sends them as files', async () => {
+    const channel = new DiscordChannel('test-token', createTestOpts());
+    await channel.connect();
+    const filePath = path.join(
+      os.tmpdir(),
+      `adventurer-active-sfx-preview-${Date.now()}.mp4`,
+    );
+    fs.writeFileSync(filePath, MINIMAL_MP4);
+    tempFiles.push(filePath);
+    const mockChannel = {
+      send: vi.fn().mockResolvedValue({ id: 'discord-message-media' }),
+      sendTyping: vi.fn(),
+    };
+    clientRef.current.channels.fetch.mockResolvedValue(mockChannel);
+
+    await channel.sendMessage(
+      'dc:1234567890123456',
+      `사운드 프리뷰입니다.\nMEDIA:${filePath}`,
+    );
+
+    expect(mockChannel.send).toHaveBeenCalledWith({
+      content: '사운드 프리뷰입니다.',
+      files: [
+        {
+          attachment: fs.realpathSync(filePath),
+          name: path.basename(filePath),
+        },
+      ],
+      flags: 1 << 2,
+    });
+    expect(JSON.stringify(mockChannel.send.mock.calls)).not.toContain('MEDIA:');
   });
 
   it('keeps non-image local markdown links readable without uploading files', async () => {
