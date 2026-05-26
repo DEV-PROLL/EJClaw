@@ -28,19 +28,20 @@ Your output is sent directly to the Discord group.
 - Do not use generic recurring task registration from Codex
 - If the user wants a reminder or other non-CI recurring task, tell them to ask Claude/클코 to schedule it
 
-## Image attachments
+## Media attachments
 
-When you need to show a locally generated image, screenshot, or other raster output in Discord, include a Markdown image with an absolute local path:
+When you need to show a locally generated image, screenshot, video, audio, or document in Discord, include a `MEDIA:` directive on its own line with an absolute local path:
 
 ```text
-![image](/absolute/path/image.png)
+MEDIA:/absolute/path/preview.mp4
 ```
 
-- You may also use `[Image: /absolute/path/image.png]` when that is shorter
+- `MEDIA:` lines are hidden from the visible message and uploaded as native Discord attachments
 - URLs and relative paths are ignored
 - Do not repeat the same file path elsewhere in the visible text
-- Supported attachment formats are raster image files: PNG, JPEG, GIF, WebP, and BMP. SVG is not accepted.
-- Use this for generated images and e2e screenshots; the Discord channel validates and uploads the file
+- Do not use generic markdown links or plain file paths as attachment directives
+- Supported formats include PNG, JPEG, GIF, WebP, BMP, MP4, MOV, WebM, MP3, WAV, OGG, M4A, FLAC, PDF, ZIP, TXT, Markdown, CSV, and JSON. SVG is not accepted.
+- Use this for generated images, e2e screenshots, previews, audio samples, and documents; the Discord channel validates and uploads the file
 
 ## CI 감시 (watch_ci)
 

@@ -5,6 +5,8 @@ export const IMAGE_TAG_RE =
   /\[Image:\s*(?:(?:[^\]\n]*?)\s*→\s*)?(\/[^\]\n]+)\]/g;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 const MARKDOWN_ABSOLUTE_LINK_RE = /!?\[[^\]\n]*\]\((\/[^)\n]+)\)/g;
+const MEDIA_TAG_RE =
+  /^[ \t]*MEDIA:\s*(?:"([^"\n]+)"|'([^'\n]+)'|`([^`\n]+)`|(\/\S+))[ \t]*$/gm;
 
 export const IPC_POLL_MS = 500;
 export const IPC_INPUT_SUBDIR = 'input';
@@ -48,6 +50,7 @@ export interface NormalizedRunnerOutput {
   output?: RunnerStructuredOutput;
   attachmentSource?:
     | 'legacy-ejclaw-json'
+    | 'media-tag'
     | 'markdown-image'
     | 'image-tag'
     | 'mixed'
@@ -113,6 +116,71 @@ export function extractMarkdownImageAttachments(text: string): {
       attachments.push({
         path: trimmed,
         name: attachmentName(trimmed),
+      });
+      return '';
+    },
+  );
+
+  return {
+    cleanText: cleanText.trim(),
+    attachments: uniqueAttachments(attachments),
+  };
+}
+
+function fencedCodeSpans(text: string): Array<[number, number]> {
+  return [...text.matchAll(/```[\s\S]*?```/g)].map((match) => [
+    match.index ?? 0,
+    (match.index ?? 0) + match[0].length,
+  ]);
+}
+
+function isInsideSpans(index: number, spans: Array<[number, number]>): boolean {
+  return spans.some(([start, end]) => index >= start && index < end);
+}
+
+function mediaMime(filePath: string): string | undefined {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.bmp')) return 'image/bmp';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  if (lower.endsWith('.webm')) return 'video/webm';
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.ogg')) return 'audio/ogg';
+  if (lower.endsWith('.m4a')) return 'audio/mp4';
+  if (lower.endsWith('.flac')) return 'audio/flac';
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.zip')) return 'application/zip';
+  if (lower.endsWith('.csv')) return 'text/csv';
+  if (lower.endsWith('.json')) return 'application/json';
+  if (lower.endsWith('.md')) return 'text/markdown';
+  if (lower.endsWith('.txt')) return 'text/plain';
+  return undefined;
+}
+
+export function extractMediaAttachments(text: string): {
+  cleanText: string;
+  attachments: RunnerOutputAttachment[];
+} {
+  const codeSpans = fencedCodeSpans(text);
+  const attachments: RunnerOutputAttachment[] = [];
+  const cleanText = text.replace(
+    MEDIA_TAG_RE,
+    (full: string, doubleQuoted, singleQuoted, backticked, bare, offset) => {
+      if (isInsideSpans(offset, codeSpans)) return full;
+      const filePath = String(
+        doubleQuoted ?? singleQuoted ?? backticked ?? bare ?? '',
+      ).trim();
+      if (!filePath.startsWith('/')) return full;
+      const mime = mediaMime(filePath);
+      attachments.push({
+        path: filePath,
+        name: attachmentName(filePath),
+        ...(mime ? { mime } : {}),
       });
       return '';
     },
@@ -319,14 +387,16 @@ export function normalizeAgentOutput(
     };
   }
 
+  const mediaExtracted = extractMediaAttachments(normalized.output.text);
   const markdownExtracted = extractMarkdownImageAttachments(
-    normalized.output.text,
+    mediaExtracted.cleanText,
   );
   const imageTagExtracted = extractImageTagPaths(markdownExtracted.cleanText);
   const imageTagAttachments = imageTagPathsToAttachments(
     imageTagExtracted.imagePaths,
   );
   const attachments = uniqueAttachments([
+    ...mediaExtracted.attachments,
     ...markdownExtracted.attachments,
     ...imageTagAttachments,
   ]);
@@ -339,11 +409,17 @@ export function normalizeAgentOutput(
   }
 
   const attachmentSource =
-    markdownExtracted.attachments.length > 0 && imageTagAttachments.length > 0
+    [
+      mediaExtracted.attachments.length > 0,
+      markdownExtracted.attachments.length > 0,
+      imageTagAttachments.length > 0,
+    ].filter(Boolean).length > 1
       ? 'mixed'
-      : markdownExtracted.attachments.length > 0
-        ? 'markdown-image'
-        : 'image-tag';
+      : mediaExtracted.attachments.length > 0
+        ? 'media-tag'
+        : markdownExtracted.attachments.length > 0
+          ? 'markdown-image'
+          : 'image-tag';
 
   return {
     result: imageTagExtracted.cleanText,

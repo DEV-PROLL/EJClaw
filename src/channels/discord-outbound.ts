@@ -9,7 +9,13 @@ export interface PreparedDiscordOutbound {
   text: string;
   cleanText: string;
   attachments: OutboundAttachment[];
-  attachmentSource: 'structured' | 'md-link' | 'image-tag' | 'mixed' | 'none';
+  attachmentSource:
+    | 'structured'
+    | 'media-tag'
+    | 'md-link'
+    | 'image-tag'
+    | 'mixed'
+    | 'none';
   silent: boolean;
 }
 
@@ -51,9 +57,11 @@ export function prepareDiscordOutbound(
       ? 'structured'
       : normalized.attachmentSource === 'legacy-ejclaw-json'
         ? 'structured'
-        : normalized.attachmentSource === 'markdown-image'
-          ? 'md-link'
-          : (normalized.attachmentSource ?? 'none');
+        : normalized.attachmentSource === 'media-tag'
+          ? 'media-tag'
+          : normalized.attachmentSource === 'markdown-image'
+            ? 'md-link'
+            : (normalized.attachmentSource ?? 'none');
 
   return {
     text: outboundText,

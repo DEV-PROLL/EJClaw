@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   extractMarkdownImageAttachments,
+  extractMediaAttachments,
   normalizeAgentOutput,
 } from '../src/agent-protocol.js';
 
@@ -40,6 +41,69 @@ describe('normalizeAgentOutput', () => {
         ],
       },
       attachmentSource: 'markdown-image',
+    });
+  });
+
+  it('normalizes MEDIA directives into internal attachments', () => {
+    expect(
+      normalizeAgentOutput(
+        'TASK_DONE\n\n사운드 프리뷰입니다.\nMEDIA:/tmp/adventurer-active-sfx-preview.mp4',
+      ),
+    ).toEqual({
+      result: 'TASK_DONE\n\n사운드 프리뷰입니다.',
+      output: {
+        visibility: 'public',
+        text: 'TASK_DONE\n\n사운드 프리뷰입니다.',
+        attachments: [
+          {
+            path: '/tmp/adventurer-active-sfx-preview.mp4',
+            name: 'adventurer-active-sfx-preview.mp4',
+            mime: 'video/mp4',
+          },
+        ],
+      },
+      attachmentSource: 'media-tag',
+    });
+  });
+
+  it('extracts quoted MEDIA paths with spaces', () => {
+    expect(
+      extractMediaAttachments(
+        '프리뷰\nMEDIA:"/tmp/Maldhalla Demo/preview.mp4"',
+      ),
+    ).toEqual({
+      cleanText: '프리뷰',
+      attachments: [
+        {
+          path: '/tmp/Maldhalla Demo/preview.mp4',
+          name: 'preview.mp4',
+          mime: 'video/mp4',
+        },
+      ],
+    });
+  });
+
+  it('does not treat MEDIA references in code fences as attachments', () => {
+    const content = '```text\nMEDIA:/tmp/not-an-attachment.mp4\n```';
+    expect(extractMediaAttachments(content)).toEqual({
+      cleanText: content,
+      attachments: [],
+    });
+  });
+
+  it('does not treat inbound attachment placeholders as outbound directives', () => {
+    expect(
+      normalizeAgentOutput(
+        'TASK_DONE\n\n[Video: preview.mp4 → /tmp/preview.mp4]\n확인했습니다.',
+      ),
+    ).toEqual({
+      result:
+        'TASK_DONE\n\n[Video: preview.mp4 → /tmp/preview.mp4]\n확인했습니다.',
+      output: {
+        visibility: 'public',
+        text: 'TASK_DONE\n\n[Video: preview.mp4 → /tmp/preview.mp4]\n확인했습니다.',
+      },
+      attachmentSource: 'none',
     });
   });
 

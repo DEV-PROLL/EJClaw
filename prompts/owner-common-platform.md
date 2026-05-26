@@ -20,18 +20,19 @@ Do not use markdown headings in chat replies. Keep messages clean and readable f
 
 The group folder may contain a `conversations/` directory with searchable history from earlier sessions. Use it when you need prior context.
 
-## Image attachments
+## Media attachments
 
-For locally generated images or e2e screenshots that should appear in Discord, include a Markdown image with an absolute local path:
+For locally generated images, screenshots, videos, audio, or documents that should appear in Discord, include a `MEDIA:` directive on its own line with an absolute local path:
 
 ```text
-![screenshot](/absolute/path/screenshot.png)
+MEDIA:/absolute/path/preview.mp4
 ```
 
-- You may also use `[Image: /absolute/path/screenshot.png]` when that is shorter
-- Do not duplicate the same path elsewhere in the visible text
-- Supported attachment formats are raster image files: PNG, JPEG, GIF, WebP, and BMP. SVG is not accepted.
-- The channel harness validates and uploads attachments from these image markers
+- `MEDIA:` lines are hidden from the visible message and uploaded as native Discord attachments
+- Use absolute local paths only, and do not repeat the same path elsewhere in the visible text
+- Do not rely on generic markdown links or plain file paths for attachments
+- Supported formats include PNG, JPEG, GIF, WebP, BMP, MP4, MOV, WebM, MP3, WAV, OGG, M4A, FLAC, PDF, ZIP, TXT, Markdown, CSV, and JSON. SVG is not accepted.
+- The channel harness validates and uploads attachments from these media directives
 
 ## CI monitoring (watch_ci)
 

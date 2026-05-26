@@ -10,6 +10,12 @@ const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
   'base64',
 );
+const MINIMAL_MP4 = Buffer.from([
+  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00,
+  0x00, 0x02, 0x00, 0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32,
+]);
+const MINIMAL_PDF = Buffer.from('%PDF-1.4\n', 'ascii');
+const MINIMAL_ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
 
 const cleanupDirs: string[] = [];
 const cleanupFiles: string[] = [];
@@ -133,6 +139,43 @@ describe('validateOutboundAttachments', () => {
     ]);
   });
 
+  it('accepts supported non-image media and document files', () => {
+    const dir = makeTempDir(os.tmpdir(), 'ejclaw-media-');
+    const mp4Path = writeFile(dir, 'preview.mp4', MINIMAL_MP4);
+    const pdfPath = writeFile(dir, 'report.pdf', MINIMAL_PDF);
+    const zipPath = writeFile(dir, 'archive.zip', MINIMAL_ZIP);
+    const textPath = writeFile(dir, 'notes.txt', 'hello\n');
+
+    const result = validateOutboundAttachments([
+      { path: mp4Path, mime: 'video/mp4' },
+      { path: pdfPath, mime: 'application/pdf' },
+      { path: zipPath, mime: 'application/zip' },
+      { path: textPath, mime: 'text/plain' },
+    ]);
+
+    expect(result.rejected).toEqual([]);
+    expect(result.files).toEqual([
+      {
+        attachment: fs.realpathSync(mp4Path),
+        name: 'preview.mp4',
+      },
+      {
+        attachment: fs.realpathSync(pdfPath),
+        name: 'report.pdf',
+      },
+      {
+        attachment: fs.realpathSync(zipPath),
+        name: 'archive.zip',
+      },
+      {
+        attachment: fs.realpathSync(textPath),
+        name: 'notes.txt',
+      },
+    ]);
+  });
+});
+
+describe('validateOutboundAttachments policy checks', () => {
   it('requires workspace paths to be explicitly allowlisted', () => {
     const dir = makeTempDir(process.cwd(), '.ejclaw-attachment-');
     const imagePath = writeFile(dir, 'workspace-shot.png', ONE_PIXEL_PNG);
@@ -240,6 +283,16 @@ describe('validateOutboundAttachments', () => {
     ).toEqual({
       files: [],
       rejected: [{ path: realPng, reason: 'mime-mismatch' }],
+    });
+  });
+
+  it('rejects supported non-image files with invalid signatures', () => {
+    const dir = makeTempDir(os.tmpdir(), 'ejclaw-media-');
+    const fakeMp4 = writeFile(dir, 'fake.mp4', 'not a movie');
+
+    expect(validateOutboundAttachments([{ path: fakeMp4 }])).toEqual({
+      files: [],
+      rejected: [{ path: fakeMp4, reason: 'invalid-file-signature' }],
     });
   });
 
