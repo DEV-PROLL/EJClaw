@@ -51,7 +51,7 @@ describe('web dashboard attachment data', () => {
       ejclaw: {
         visibility: 'public',
         text: '라벨 좌측 클리핑 회귀 수정했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/bar-chart-label-fit-playwright.png',
@@ -67,7 +67,7 @@ describe('web dashboard attachment data', () => {
       turn_number: 1,
       role: 'owner',
       output_text: structured,
-      verdict: 'done',
+      verdict: 'task_done',
       created_at: '2026-04-26T05:30:00.000Z',
     };
     const message: NewMessage = {

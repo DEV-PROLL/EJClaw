@@ -1,11 +1,13 @@
 import type { Logger } from 'pino';
 
 import { createEvaluatedOutputHandler } from './agent-attempt.js';
+import { getAgentOutputTurnVerdict } from './agent-output.js';
 import type { AttemptStreamedTrigger } from './agent-attempt-retry.js';
 import { runAgentProcess, type AgentOutput } from './agent-runner.js';
 import { markCompactRefreshNeeded } from './compact-refresh.js';
 import { getCodexAccountCount } from './codex-token-rotation.js';
 import type { PreparedPairedExecutionContext } from './paired-execution-context.js';
+import type { TurnVerdict } from './paired-verdict.js';
 import {
   shouldResetCodexSessionOnAgentFailure,
   shouldResetSessionOnAgentFailure,
@@ -33,6 +35,37 @@ interface AgentInput {
   isMain: boolean;
   assistantName: string;
   roomRoleContext?: RoomRoleContext;
+}
+
+interface RunMessageAgentAttemptArgs {
+  provider: 'claude' | 'codex';
+  currentSessionId: string | undefined;
+  isClaudeCodeAgent: boolean;
+  canRetryClaudeCredentials: boolean;
+  shouldPersistSession: boolean;
+  effectiveGroup: RegisteredGroup;
+  agentInput: AgentInput;
+  activeRole: string;
+  effectiveServiceId: string;
+  effectiveAgentType: AgentType;
+  sessionFolder: string;
+  roomRoleContext?: RoomRoleContext;
+  pairedExecutionContext?: PreparedPairedExecutionContext;
+  fallbackWorkspaceDir?: string | null;
+  onPersistSession: (sessionId: string) => void;
+  registerProcess: Parameters<typeof runAgentProcess>[2];
+  onOutput?: (output: AgentOutput) => Promise<void>;
+  pairedExecutionLifecycle: {
+    updateSummary(args: {
+      outputText?: string | null;
+      errorText?: string | null;
+    }): void;
+    recordFinalOutputBeforeDelivery(
+      outputText: string,
+      verdict?: TurnVerdict | null,
+    ): boolean;
+  };
+  log: Logger;
 }
 
 function maybeMarkCompactRefreshForOutput(args: {
@@ -64,43 +97,16 @@ function createProviderLog(
   return providerLog;
 }
 
-export async function runMessageAgentAttempt(args: {
-  provider: 'claude' | 'codex';
-  currentSessionId: string | undefined;
-  isClaudeCodeAgent: boolean;
-  canRetryClaudeCredentials: boolean;
-  shouldPersistSession: boolean;
-  effectiveGroup: RegisteredGroup;
-  agentInput: AgentInput;
-  activeRole: string;
-  effectiveServiceId: string;
-  effectiveAgentType: AgentType;
-  sessionFolder: string;
-  roomRoleContext?: RoomRoleContext;
-  pairedExecutionContext?: PreparedPairedExecutionContext;
-  fallbackWorkspaceDir?: string | null;
-  onPersistSession: (sessionId: string) => void;
-  registerProcess: (
-    proc: Parameters<typeof runAgentProcess>[2] extends (
-      proc: infer TProc,
-      processName: infer TProcessName,
-      ipcDir: infer TIpcDir,
-    ) => unknown
-      ? TProc
-      : never,
-    processName: string,
-    ipcDir?: string,
-  ) => void;
-  onOutput?: (output: AgentOutput) => Promise<void>;
-  pairedExecutionLifecycle: {
-    updateSummary(args: {
-      outputText?: string | null;
-      errorText?: string | null;
-    }): void;
-    recordFinalOutputBeforeDelivery(outputText: string): boolean;
-  };
-  log: Logger;
-}): Promise<MessageAgentAttempt> {
+function finalTurnVerdictForOutput(
+  outputPhase: AgentOutput['phase'],
+  output: AgentOutput,
+): TurnVerdict | null {
+  return outputPhase === 'final' ? getAgentOutputTurnVerdict(output) : null;
+}
+
+export async function runMessageAgentAttempt(
+  args: RunMessageAgentAttemptArgs,
+): Promise<MessageAgentAttempt> {
   const {
     provider,
     currentSessionId,
@@ -262,6 +268,7 @@ export async function runMessageAgentAttempt(args: {
           finalOutputAccepted =
             pairedExecutionLifecycle.recordFinalOutputBeforeDelivery(
               outputText,
+              getAgentOutputTurnVerdict(output),
             );
         } catch (err) {
           log.warn(

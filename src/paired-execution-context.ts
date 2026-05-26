@@ -65,6 +65,7 @@ import type {
   RegisteredGroup,
   RoomRoleContext,
 } from './types.js';
+import type { TurnVerdict } from './paired-verdict.js';
 import { resolveRoleAgentPlan } from './role-agent-plan.js';
 
 const TASK_DONE_REOPEN_WINDOW_MS = 10 * 60_000;
@@ -621,6 +622,7 @@ export function completePairedExecutionContext(args: {
   status: 'succeeded' | 'failed';
   runId?: string;
   summary?: string | null;
+  verdict?: TurnVerdict | null;
 }): void {
   const { taskId, role, status } = args;
   let completionError: unknown;
@@ -658,6 +660,7 @@ export function completePairedExecutionContext(args: {
           task,
           taskId,
           summary: args.summary,
+          verdict: args.verdict,
         });
         return;
       }
@@ -665,7 +668,11 @@ export function completePairedExecutionContext(args: {
         handleFailedArbiterExecution({ task, taskId });
         return;
       }
-      handleFailedOwnerExecution({ task, taskId, summary: args.summary });
+      handleFailedOwnerExecution({
+        task,
+        taskId,
+        summary: args.summary,
+      });
       return;
     }
 
@@ -691,12 +698,22 @@ export function completePairedExecutionContext(args: {
         }
         throw error;
       }
-      handleOwnerCompletion({ task, taskId, summary: args.summary });
+      handleOwnerCompletion({
+        task,
+        taskId,
+        summary: args.summary,
+        verdict: args.verdict,
+      });
       return;
     }
 
     if (role === 'reviewer') {
-      handleReviewerCompletion({ task, taskId, summary: args.summary });
+      handleReviewerCompletion({
+        task,
+        taskId,
+        summary: args.summary,
+        verdict: args.verdict,
+      });
       return;
     }
 

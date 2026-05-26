@@ -9,7 +9,7 @@ describe('web dashboard room envelope rendering', () => {
       ejclaw: {
         visibility: 'public',
         text: 'PR #52 모바일/룸 parity 검증 스크린샷입니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/ejclaw-room-mobile-list-390.png',

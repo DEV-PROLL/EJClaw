@@ -638,7 +638,7 @@ describe('IPC message authorization', () => {
           ejclaw: {
             visibility: 'public',
             text: '첨부를 렌더링했습니다.',
-            verdict: 'done',
+            verdict: 'task_done',
             attachments: [
               {
                 path: '/tmp/bar-chart-label-fit-playwright.png',

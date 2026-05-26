@@ -1,3 +1,10 @@
+import {
+  normalizeRunnerOutputVerdict,
+  parseVisibleTurnVerdict,
+  type RunnerOutputVerdict,
+} from './turn-verdict.js';
+export type { RunnerOutputVerdict } from './turn-verdict.js';
+
 export const OUTPUT_START_MARKER = '---EJCLAW_OUTPUT_START---';
 export const OUTPUT_END_MARKER = '---EJCLAW_OUTPUT_END---';
 
@@ -17,13 +24,6 @@ export type RunnerOutputPhase =
   | 'final'
   | 'tool-activity'
   | 'intermediate';
-
-export type RunnerOutputVerdict =
-  | 'done'
-  | 'done_with_concerns'
-  | 'blocked'
-  | 'in_progress'
-  | 'silent';
 
 export type RunnerOutputVisibility = 'public' | 'silent';
 
@@ -224,12 +224,7 @@ export function normalizePublicTextOutput(
 function isVisibleVerdict(
   value: unknown,
 ): value is Exclude<RunnerOutputVerdict, 'silent'> {
-  return (
-    value === 'done' ||
-    value === 'done_with_concerns' ||
-    value === 'blocked' ||
-    value === 'in_progress'
-  );
+  return value !== 'silent' && normalizeRunnerOutputVerdict(value) !== null;
 }
 
 const LEADING_STRUCTURED_OUTPUT_CONTROL_RE =
@@ -348,14 +343,15 @@ export function normalizeEjclawStructuredOutput(
         }
         const attachments = normalizeAttachments(envelope.attachments);
         const text = prefixStructuredText(envelope.text, statusPrefix);
+        const verdict = isVisibleVerdict(envelope.verdict)
+          ? normalizeRunnerOutputVerdict(envelope.verdict)
+          : null;
         return {
           result: text,
           output: {
             visibility: 'public',
             text,
-            verdict: isVisibleVerdict(envelope.verdict)
-              ? envelope.verdict
-              : undefined,
+            ...(verdict ? { verdict } : {}),
             ...(attachments.length > 0 ? { attachments } : {}),
           },
         };
@@ -380,9 +376,16 @@ export function normalizeAgentOutput(
   }
 
   const explicitAttachments = normalized.output.attachments ?? [];
+  const normalizedVerdict =
+    normalizeRunnerOutputVerdict(normalized.output.verdict) ??
+    parseVisibleTurnVerdict(normalized.output.text);
   if (explicitAttachments.length > 0) {
     return {
       ...normalized,
+      output: {
+        ...normalized.output,
+        verdict: normalizedVerdict,
+      },
       attachmentSource: 'legacy-ejclaw-json',
     };
   }
@@ -404,6 +407,10 @@ export function normalizeAgentOutput(
   if (attachments.length === 0) {
     return {
       ...normalized,
+      output: {
+        ...normalized.output,
+        verdict: normalizedVerdict,
+      },
       attachmentSource: normalized.attachmentSource ?? 'none',
     };
   }
@@ -426,9 +433,7 @@ export function normalizeAgentOutput(
     output: {
       visibility: 'public',
       text: imageTagExtracted.cleanText,
-      ...(normalized.output.verdict
-        ? { verdict: normalized.output.verdict }
-        : {}),
+      verdict: normalizedVerdict,
       attachments,
     },
     attachmentSource,

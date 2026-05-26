@@ -1,3 +1,5 @@
+import type { RunnerOutputVerdict } from 'ejclaw-runners-shared';
+
 import type { VisibleVerdict } from './paired-verdict.js';
 
 export interface AgentConfig {
@@ -155,10 +157,12 @@ export type StructuredAgentOutput =
   | {
       visibility: 'public';
       text: string;
+      verdict?: Exclude<RunnerOutputVerdict, 'silent'>;
       attachments?: OutboundAttachment[];
     }
   | {
       visibility: 'silent';
+      verdict?: 'silent';
     };
 
 export function normalizeAgentOutputPhase(

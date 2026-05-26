@@ -69,7 +69,6 @@ export function resolveReviewerCompletionSignal(args: {
 
   switch (visibleVerdict) {
     case 'task_done':
-    case 'done':
       return { kind: 'request_owner_finalize' };
     case 'step_done':
       if (roundTripCount >= deadlockThreshold) {
@@ -96,7 +95,6 @@ export function resolveReviewerFailureSignal(args: {
 
   switch (visibleVerdict) {
     case 'task_done':
-    case 'done':
       return { kind: 'request_owner_finalize' };
     case 'blocked':
     case 'needs_context':

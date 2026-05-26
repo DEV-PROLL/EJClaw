@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyArbiterVerdict,
   parseVisibleVerdict,
+  resolveStoredVisibleVerdict,
 } from './paired-verdict.js';
 
 describe('paired verdict parser', () => {
   it('parses visible verdicts from leading summary lines', () => {
     expect(parseVisibleVerdict('STEP_DONE\nmore to do')).toBe('step_done');
     expect(parseVisibleVerdict('TASK_DONE\nall done')).toBe('task_done');
+    expect(parseVisibleVerdict('DONE\nlegacy done')).toBe('task_done');
+    expect(parseVisibleVerdict('Approved.\nlegacy review')).toBe('task_done');
     expect(
       parseVisibleVerdict(
         'DONE_WITH_CONCERNS\n\nfollow-up detail that should not affect parsing',
@@ -16,6 +19,19 @@ describe('paired verdict parser', () => {
     ).toBe('done_with_concerns');
     expect(parseVisibleVerdict('BLOCKED\nextra detail')).toBe('blocked');
     expect(parseVisibleVerdict('random prose')).toBe('continue');
+  });
+
+  it('normalizes stored legacy verdict values', () => {
+    expect(resolveStoredVisibleVerdict({ verdict: 'done' })).toBe('task_done');
+    expect(resolveStoredVisibleVerdict({ verdict: 'in_progress' })).toBe(
+      'continue',
+    );
+    expect(
+      resolveStoredVisibleVerdict({
+        verdict: 'mystery',
+        outputText: 'STEP_DONE\nfallback',
+      }),
+    ).toBe('step_done');
   });
 
   it('accepts status tokens a few visible lines into the summary', () => {

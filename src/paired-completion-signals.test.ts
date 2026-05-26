@@ -20,7 +20,7 @@ describe('paired completion signals', () => {
     expect(
       resolveOwnerCompletionSignal({
         phase: 'normal',
-        visibleVerdict: 'done',
+        visibleVerdict: 'task_done',
       }),
     ).toEqual({
       kind: 'request_reviewer',
@@ -50,7 +50,7 @@ describe('paired completion signals', () => {
     expect(
       resolveOwnerCompletionSignal({
         phase: 'finalize',
-        visibleVerdict: 'done',
+        visibleVerdict: 'task_done',
         hasChangesSinceApproval: false,
         roundTripCount: 0,
         deadlockThreshold: 2,
@@ -71,7 +71,7 @@ describe('paired completion signals', () => {
     expect(
       resolveOwnerCompletionSignal({
         phase: 'finalize',
-        visibleVerdict: 'done',
+        visibleVerdict: 'task_done',
         hasChangesSinceApproval: true,
         roundTripCount: 3,
         deadlockThreshold: 3,
@@ -103,7 +103,7 @@ describe('paired completion signals', () => {
     ).toEqual({ kind: 'request_arbiter' });
     expect(
       resolveReviewerCompletionSignal({
-        visibleVerdict: 'done',
+        visibleVerdict: 'task_done',
         roundTripCount: 0,
         deadlockThreshold: 3,
       }),
@@ -132,7 +132,7 @@ describe('paired completion signals', () => {
     ).toEqual({ kind: 'request_owner_finalize' });
     expect(
       resolveReviewerFailureSignal({
-        visibleVerdict: 'done',
+        visibleVerdict: 'task_done',
       }),
     ).toEqual({ kind: 'request_owner_finalize' });
     expect(

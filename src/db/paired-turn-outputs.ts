@@ -1,7 +1,11 @@
 import { Database } from 'bun:sqlite';
 
 import { logger } from '../logger.js';
-import { parseVisibleVerdict } from '../paired-verdict.js';
+import {
+  normalizeTurnVerdictValue,
+  parseVisibleVerdict,
+  type TurnVerdict,
+} from '../paired-verdict.js';
 import { PairedRoomRole, PairedTurnOutput } from '../types.js';
 
 const MAX_TURN_OUTPUT_CHARS = 50_000;
@@ -13,6 +17,7 @@ export function insertPairedTurnOutputInDatabase(
   role: PairedRoomRole,
   outputText: string,
   createdAt?: string,
+  verdict?: TurnVerdict | null,
 ): void {
   if (outputText.length > MAX_TURN_OUTPUT_CHARS) {
     logger.warn(
@@ -38,7 +43,7 @@ export function insertPairedTurnOutputInDatabase(
       turnNumber,
       role,
       outputText.slice(0, MAX_TURN_OUTPUT_CHARS),
-      parseVisibleVerdict(outputText),
+      verdict ?? parseVisibleVerdict(outputText),
       createdAt ?? new Date().toISOString(),
     );
 }
@@ -47,13 +52,17 @@ export function getPairedTurnOutputsFromDatabase(
   database: Database,
   taskId: string,
 ): PairedTurnOutput[] {
-  return database
+  const rows = database
     .prepare(
       `SELECT * FROM paired_turn_outputs
         WHERE task_id = ?
         ORDER BY turn_number ASC`,
     )
     .all(taskId) as PairedTurnOutput[];
+  return rows.map((output) => ({
+    ...output,
+    verdict: normalizeTurnVerdictValue(output.verdict) ?? null,
+  }));
 }
 
 const recentOutputsForChatStmtCache = new WeakMap<
@@ -78,7 +87,12 @@ export function getRecentPairedTurnOutputsForChatFromDatabase(
     `);
     recentOutputsForChatStmtCache.set(database, stmt);
   }
-  const rows = stmt.all(chatJid, limit) as PairedTurnOutput[];
+  const rows = (stmt.all(chatJid, limit) as PairedTurnOutput[]).map(
+    (output) => ({
+      ...output,
+      verdict: normalizeTurnVerdictValue(output.verdict) ?? null,
+    }),
+  );
   return rows.reverse();
 }
 

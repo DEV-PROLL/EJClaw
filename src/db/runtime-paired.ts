@@ -350,6 +350,7 @@ export function insertPairedTurnOutput(
   role: PairedRoomRole,
   outputText: string,
   createdAt?: string,
+  verdict?: import('../paired-verdict.js').TurnVerdict | null,
 ): void {
   insertPairedTurnOutputInDatabase(
     requireDatabase(),
@@ -358,6 +359,7 @@ export function insertPairedTurnOutput(
     role,
     outputText,
     createdAt,
+    verdict,
   );
 }
 

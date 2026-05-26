@@ -1,4 +1,7 @@
+import { normalizeRunnerOutputVerdict } from 'ejclaw-runners-shared';
+
 import type { StructuredAgentOutput } from './types.js';
+import type { TurnVerdict } from './paired-verdict.js';
 
 export function stringifyLegacyAgentResult(
   result: string | object | null | undefined,
@@ -32,6 +35,14 @@ export function getAgentOutputText(output: {
     return structured.text;
   }
   return stringifyLegacyAgentResult(output.result);
+}
+
+export function getAgentOutputTurnVerdict(output: {
+  output?: StructuredAgentOutput;
+}): TurnVerdict | null {
+  const structured = getStructuredAgentOutput(output);
+  if (!structured || structured.visibility !== 'public') return null;
+  return normalizeRunnerOutputVerdict(structured.verdict);
 }
 
 export function getAgentOutputAttachments(output: {

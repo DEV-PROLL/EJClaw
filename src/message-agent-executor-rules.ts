@@ -3,7 +3,7 @@ import {
   resolveNextTurnAction,
   shouldRetrySilentOwnerExecution,
 } from './message-runtime-rules.js';
-import { parseVisibleVerdict } from './paired-verdict.js';
+import { parseVisibleVerdict, type TurnVerdict } from './paired-verdict.js';
 import type { PairedRoomRole, PairedTaskStatus } from './types.js';
 export {
   isRetryableClaudeSessionFailureAttempt,
@@ -23,6 +23,7 @@ export function resolvePairedFollowUpQueueAction(args: {
   sawOutput: boolean;
   taskStatus: PairedTaskStatus | null;
   outputSummary?: string | null;
+  outputVerdict?: TurnVerdict | null;
 }): PairedFollowUpQueueAction {
   if (
     shouldRetrySilentOwnerExecution({
@@ -39,8 +40,8 @@ export function resolvePairedFollowUpQueueAction(args: {
     taskStatus: args.taskStatus,
     lastTurnOutputRole: args.sawOutput ? args.completedRole : null,
     lastTurnOutputVerdict:
-      args.sawOutput && args.outputSummary
-        ? parseVisibleVerdict(args.outputSummary)
+      args.sawOutput && (args.outputVerdict || args.outputSummary)
+        ? (args.outputVerdict ?? parseVisibleVerdict(args.outputSummary))
         : null,
   });
   const dispatch = resolveFollowUpDispatch({

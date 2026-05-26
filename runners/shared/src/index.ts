@@ -25,6 +25,14 @@ export {
   type RunnerStructuredOutput,
 } from './agent-protocol.js';
 export {
+  normalizeRunnerOutputVerdict,
+  normalizeTurnVerdictValue,
+  parseVisibleTurnVerdict,
+  type LegacyTurnVerdict,
+  type RunnerOutputVerdict as CanonicalRunnerOutputVerdict,
+  type TurnVerdict,
+} from './turn-verdict.js';
+export {
   assertReadonlyWorkspaceRepoConnectivity,
   buildReviewerGitGuardEnv,
   isReviewerRuntime,

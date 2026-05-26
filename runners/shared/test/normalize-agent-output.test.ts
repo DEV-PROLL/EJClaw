@@ -33,6 +33,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE\n\n스크린샷입니다.',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/screenshot.png',
@@ -54,6 +55,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE\n\n사운드 프리뷰입니다.',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/adventurer-active-sfx-preview.mp4',
@@ -102,6 +104,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE\n\n[Video: preview.mp4 → /tmp/preview.mp4]\n확인했습니다.',
+        verdict: 'task_done',
       },
       attachmentSource: 'none',
     });
@@ -117,6 +120,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE\n\n스크린샷입니다.',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/legacy.png',
@@ -136,6 +140,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/short-form.png',
@@ -170,7 +175,7 @@ describe('normalizeAgentOutput', () => {
       output: {
         visibility: 'public',
         text: '이미지를 첨부했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/compat.png',

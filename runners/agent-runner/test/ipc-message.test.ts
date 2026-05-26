@@ -46,7 +46,7 @@ describe('agent runner IPC message payload', () => {
           ejclaw: {
             visibility: 'public',
             text: '스크린샷입니다.',
-            verdict: 'done',
+            verdict: 'task_done',
             attachments: [
               {
                 path: '/tmp/ejclaw-room-mobile-list-390.png',

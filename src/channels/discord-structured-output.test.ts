@@ -146,7 +146,7 @@ describe('DiscordChannel structured output', () => {
         ejclaw: {
           visibility: 'public',
           text: '라벨 좌측 클리핑 회귀 수정했습니다.',
-          verdict: 'done',
+          verdict: 'task_done',
           attachments: [
             {
               path: filePath,
@@ -202,7 +202,7 @@ ${JSON.stringify({
   ejclaw: {
     visibility: 'public',
     text: '첨부 테스트입니다.',
-    verdict: 'done',
+    verdict: 'task_done',
     attachments: [
       {
         path: filePath,

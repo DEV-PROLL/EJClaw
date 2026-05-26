@@ -58,7 +58,7 @@ describe('shared agent protocol helpers', () => {
           ejclaw: {
             visibility: 'public',
             text: '이미지를 생성했습니다.',
-            verdict: 'done',
+            verdict: 'task_done',
             attachments: [
               {
                 path: '/tmp/image.png',
@@ -74,7 +74,7 @@ describe('shared agent protocol helpers', () => {
       output: {
         visibility: 'public',
         text: '이미지를 생성했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/image.png',
@@ -109,7 +109,7 @@ describe('shared agent protocol helpers', () => {
       output: {
         visibility: 'public',
         text: '검 아이콘을 생성했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/imagegen-sword.png',
@@ -144,7 +144,7 @@ describe('shared agent protocol helpers', () => {
       output: {
         visibility: 'public',
         text: '최종 이미지를 첨부했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/ejclaw-discord-image-final.png',
@@ -181,7 +181,7 @@ describe('shared agent protocol helpers', () => {
       output: {
         visibility: 'public',
         text: 'TASK_DONE\n\n이미지를 첨부했습니다.',
-        verdict: 'done',
+        verdict: 'task_done',
         attachments: [
           {
             path: '/tmp/ejclaw-discord-image-status.png',
@@ -200,7 +200,7 @@ describe('shared agent protocol fallback behavior', () => {
       ejclaw: {
         visibility: 'public',
         text: '이미지를 생성하는 중입니다.',
-        verdict: 'in_progress',
+        verdict: 'continue',
         attachments: [
           {
             path: '/tmp/ejclaw-discord-image-draft.png',
@@ -218,7 +218,7 @@ describe('shared agent protocol fallback behavior', () => {
       output: {
         visibility: 'public',
         text: '이미지를 생성하는 중입니다.',
-        verdict: 'in_progress',
+        verdict: 'continue',
         attachments: [
           {
             path: '/tmp/ejclaw-discord-image-draft.png',
@@ -241,7 +241,7 @@ describe('shared agent protocol fallback behavior', () => {
       output: {
         visibility: 'public',
         text: '스크린샷입니다.',
-        verdict: 'done',
+        verdict: 'task_done',
       },
     });
   });

@@ -14,7 +14,7 @@ import {
   completePairedExecutionContext,
   type PreparedPairedExecutionContext,
 } from './paired-execution-context.js';
-import { parseVisibleVerdict } from './paired-verdict.js';
+import { parseVisibleVerdict, type TurnVerdict } from './paired-verdict.js';
 import { resolvePairedFollowUpQueueAction } from './message-agent-executor-rules.js';
 import { enqueuePairedFollowUpAfterEvent } from './message-runtime-follow-up.js';
 import type { PairedTurnIdentity } from './paired-turn-identity.js';
@@ -25,6 +25,8 @@ import type { PairedRoomRole } from './types.js';
 type ExecutorLog = Pick<typeof logger, 'info' | 'warn'>;
 
 const PAIRED_TASK_EXECUTION_LEASE_HEARTBEAT_MS = 30_000;
+const MISSING_VISIBLE_VERDICT_SUMMARY =
+  'Execution completed without a visible terminal verdict.';
 
 type PairedTaskRecord = NonNullable<ReturnType<typeof getPairedTaskById>>;
 
@@ -47,12 +49,28 @@ function releaseInterruptedPairedExecution(
   }
 }
 
+function releaseDelegatedPairedExecution(
+  context: PreparedPairedExecutionContext,
+  runId: string,
+  log: ExecutorLog,
+): void {
+  try {
+    releasePairedTaskExecutionLease({ taskId: context.task.id, runId });
+  } catch (err) {
+    log.warn(
+      { pairedTaskId: context.task.id, runId, err },
+      'Failed to release paired execution lease for delegated fallback handoff',
+    );
+  }
+}
+
 function completeStoredExecution(
   taskId: string,
   role: PairedRoomRole,
   status: 'succeeded' | 'failed',
   runId: string,
   summary: string | null,
+  verdict?: TurnVerdict | null,
 ): void {
   completePairedExecutionContext({
     taskId,
@@ -60,7 +78,44 @@ function completeStoredExecution(
     status,
     runId,
     summary,
+    ...(verdict ? { verdict } : {}),
   });
+}
+
+function insertTurnOutputWithVerdict(args: {
+  taskId: string;
+  turnNumber: number;
+  role: PairedRoomRole;
+  outputText: string;
+  verdict?: TurnVerdict | null;
+}): void {
+  if (args.verdict) {
+    insertPairedTurnOutput(
+      args.taskId,
+      args.turnNumber,
+      args.role,
+      args.outputText,
+      undefined,
+      args.verdict,
+    );
+    return;
+  }
+
+  insertPairedTurnOutput(
+    args.taskId,
+    args.turnNumber,
+    args.role,
+    args.outputText,
+  );
+}
+
+function resolveFallbackTurnVerdict(
+  sawOutput: boolean,
+  verdict: TurnVerdict | null,
+  summary: string | null,
+): TurnVerdict | null {
+  if (!sawOutput || (!verdict && !summary)) return null;
+  return verdict ?? parseVisibleVerdict(summary);
 }
 
 async function notifyPairedCompletionIfNeeded(args: {
@@ -89,7 +144,10 @@ export interface PairedExecutionLifecycle {
     outputText?: string | null;
     errorText?: string | null;
   }): void;
-  recordFinalOutputBeforeDelivery(outputText: string): boolean;
+  recordFinalOutputBeforeDelivery(
+    outputText: string,
+    verdict?: TurnVerdict | null,
+  ): boolean;
   completeImmediately(args: { status: 'succeeded' | 'failed' }): void;
   markDelegated(): void;
   markStatus(status: 'succeeded' | 'failed'): void;
@@ -98,7 +156,7 @@ export interface PairedExecutionLifecycle {
   asyncFinalize(): Promise<void>;
 }
 
-export function createPairedExecutionLifecycle(args: {
+interface CreatePairedExecutionLifecycleArgs {
   pairedExecutionContext?: PreparedPairedExecutionContext;
   pairedTurnIdentity?: PairedTurnIdentity;
   completedRole: PairedRoomRole;
@@ -109,7 +167,11 @@ export function createPairedExecutionLifecycle(args: {
   getCloseReason?: () => string | null;
   onOutput?: (output: AgentOutput) => Promise<void>;
   log: ExecutorLog;
-}): PairedExecutionLifecycle {
+}
+
+export function createPairedExecutionLifecycle(
+  args: CreatePairedExecutionLifecycleArgs,
+): PairedExecutionLifecycle {
   const {
     pairedExecutionContext,
     pairedTurnIdentity,
@@ -126,6 +188,7 @@ export function createPairedExecutionLifecycle(args: {
   let pairedExecutionStatus: 'succeeded' | 'failed' = 'failed';
   let pairedExecutionSummary: string | null = null;
   let pairedFinalOutput: string | null = null;
+  let pairedFinalVerdict: TurnVerdict | null = null;
   let pairedSummaryLocked = false;
   let pairedExecutionCompleted = false;
   let pairedExecutionDelegated = false;
@@ -135,8 +198,6 @@ export function createPairedExecutionLifecycle(args: {
   let leaseHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
   const requiresVisibleVerdict =
     pairedExecutionContext?.requiresVisibleVerdict === true;
-  const missingVisibleVerdictSummary =
-    'Execution completed without a visible terminal verdict.';
   const wasInterruptedByHumanMessage = (): boolean =>
     isHumanMessageCloseReason(getCloseReason?.() ?? null);
 
@@ -252,12 +313,13 @@ export function createPairedExecutionLifecycle(args: {
     }
 
     const turnNumber = getLatestTurnNumber(pairedExecutionContext.task.id) + 1;
-    insertPairedTurnOutput(
-      pairedExecutionContext.task.id,
+    insertTurnOutputWithVerdict({
+      taskId: pairedExecutionContext.task.id,
       turnNumber,
-      completedRole,
-      pairedFinalOutput,
-    );
+      role: completedRole,
+      outputText: pairedFinalOutput,
+      verdict: pairedFinalVerdict,
+    });
     pairedTurnOutputPersisted = true;
   };
 
@@ -282,13 +344,20 @@ export function createPairedExecutionLifecycle(args: {
       status: 'succeeded',
       runId,
       summary: pairedExecutionSummary,
+      ...(pairedFinalVerdict ? { verdict: pairedFinalVerdict } : {}),
     });
     pairedExecutionCompleted = true;
   };
 
-  const lockVisibleVerdict = (outputText: string) => {
+  const lockVisibleVerdict = (
+    outputText: string,
+    verdict?: TurnVerdict | null,
+  ) => {
     if (outputText.length === 0) {
       return;
+    }
+    if (verdict) {
+      pairedFinalVerdict = verdict;
     }
     if (!pairedFinalOutput || pairedFinalOutput.length === 0) {
       pairedFinalOutput = outputText;
@@ -338,12 +407,12 @@ export function createPairedExecutionLifecycle(args: {
       }
     },
 
-    recordFinalOutputBeforeDelivery(outputText) {
+    recordFinalOutputBeforeDelivery(outputText, verdict) {
       if (wasInterruptedByHumanMessage()) return false;
       if (!currentRunOwnsActiveAttempt('streamed-final-output')) {
         return false;
       }
-      lockVisibleVerdict(outputText);
+      lockVisibleVerdict(outputText, verdict);
       completeSuccessfulOwnerTurnBeforeDeliveryIfNeeded();
       persistPairedTurnOutputIfNeeded();
       return true;
@@ -366,6 +435,7 @@ export function createPairedExecutionLifecycle(args: {
         status,
         runId,
         summary: pairedExecutionSummary,
+        ...(pairedFinalVerdict ? { verdict: pairedFinalVerdict } : {}),
       });
       pairedExecutionCompleted = true;
     },
@@ -394,21 +464,7 @@ export function createPairedExecutionLifecycle(args: {
       }
 
       if (pairedExecutionContext && pairedExecutionDelegated) {
-        try {
-          releasePairedTaskExecutionLease({
-            taskId: pairedExecutionContext.task.id,
-            runId,
-          });
-        } catch (err) {
-          log.warn(
-            {
-              pairedTaskId: pairedExecutionContext.task.id,
-              runId,
-              err,
-            },
-            'Failed to release paired execution lease for delegated fallback handoff',
-          );
-        }
+        releaseDelegatedPairedExecution(pairedExecutionContext, runId, log);
         pairedExecutionCompleted = true;
         return;
       }
@@ -419,7 +475,7 @@ export function createPairedExecutionLifecycle(args: {
         requiresVisibleVerdict &&
         (!pairedFinalOutput || pairedFinalOutput.length === 0);
       if (missingVisibleVerdict) {
-        pairedExecutionSummary = missingVisibleVerdictSummary;
+        pairedExecutionSummary = MISSING_VISIBLE_VERDICT_SUMMARY;
         log.warn(
           {
             pairedTaskId: pairedExecutionContext?.task.id ?? null,
@@ -466,6 +522,7 @@ export function createPairedExecutionLifecycle(args: {
             effectiveStatus,
             runId,
             pairedExecutionSummary,
+            pairedFinalVerdict,
           );
         }
         pairedExecutionCompleted = true;
@@ -499,6 +556,7 @@ export function createPairedExecutionLifecycle(args: {
               sawOutput: sawOutputForFollowUp,
               taskStatus: finishedTask?.status ?? null,
               outputSummary: pairedExecutionSummary,
+              outputVerdict: pairedFinalVerdict,
             });
       if (queueAction !== 'pending' || !finishedTask) {
         return;
@@ -513,10 +571,11 @@ export function createPairedExecutionLifecycle(args: {
         executionStatus: effectiveStatus,
         sawOutput: sawOutputForFollowUp,
         fallbackLastTurnOutputRole: sawOutputForFollowUp ? completedRole : null,
-        fallbackLastTurnOutputVerdict:
-          sawOutputForFollowUp && pairedExecutionSummary
-            ? parseVisibleVerdict(pairedExecutionSummary)
-            : null,
+        fallbackLastTurnOutputVerdict: resolveFallbackTurnVerdict(
+          sawOutputForFollowUp,
+          pairedFinalVerdict,
+          pairedExecutionSummary,
+        ),
         enqueueMessageCheck,
       });
       if (followUpResult.kind !== 'paired-follow-up') {

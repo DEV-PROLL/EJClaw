@@ -16,7 +16,7 @@ import {
 } from './paired-task-status.js';
 import { resolveOwnerCompletionSignal } from './paired-completion-signals.js';
 import { hasCodeChangesSinceRef } from './paired-source-ref.js';
-import { parseVisibleVerdict } from './paired-verdict.js';
+import { parseVisibleVerdict, type TurnVerdict } from './paired-verdict.js';
 import type { PairedTask } from './types.js';
 
 type OwnerFinalizeOutcome = 'stop' | 're_review';
@@ -93,10 +93,11 @@ function handleOwnerFinalizeCompletion(args: {
   task: PairedTask;
   taskId: string;
   summary?: string | null;
+  verdict?: TurnVerdict | null;
   now: string;
 }): OwnerFinalizeOutcome {
   const { task, taskId, summary, now } = args;
-  const ownerVerdict = parseVisibleVerdict(summary);
+  const ownerVerdict = args.verdict ?? parseVisibleVerdict(summary);
   const workspace = getPairedWorkspace(task.id, 'owner');
   const hasNewChanges = workspace?.workspace_dir
     ? hasCodeChangesSinceRef(workspace.workspace_dir, task.source_ref)
@@ -317,6 +318,7 @@ export function handleOwnerCompletion(args: {
   task: PairedTask;
   taskId: string;
   summary?: string | null;
+  verdict?: TurnVerdict | null;
 }): void {
   const { task, taskId, summary } = args;
   const now = new Date().toISOString();
@@ -326,6 +328,7 @@ export function handleOwnerCompletion(args: {
       task,
       taskId,
       summary,
+      verdict: args.verdict,
       now,
     });
     if (finalizeOutcome === 're_review') {
@@ -340,7 +343,7 @@ export function handleOwnerCompletion(args: {
     return;
   }
 
-  const ownerVerdict = parseVisibleVerdict(summary);
+  const ownerVerdict = args.verdict ?? parseVisibleVerdict(summary);
   const workspace = getPairedWorkspace(task.id, 'owner');
   const hasNewChanges = workspace?.workspace_dir
     ? hasCodeChangesSinceRef(workspace.workspace_dir, task.source_ref)

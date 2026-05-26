@@ -8,19 +8,20 @@ import {
   resolveReviewerFailureSignal,
 } from './paired-completion-signals.js';
 import { resolveCanonicalSourceRef } from './paired-source-ref.js';
-import { parseVisibleVerdict } from './paired-verdict.js';
+import { parseVisibleVerdict, type TurnVerdict } from './paired-verdict.js';
 import type { PairedTask } from './types.js';
 
 export function handleFailedReviewerExecution(args: {
   task: PairedTask;
   taskId: string;
   summary?: string | null;
+  verdict?: TurnVerdict | null;
 }): void {
   const { task, taskId, summary } = args;
   const now = new Date().toISOString();
 
   if (summary) {
-    const verdict = parseVisibleVerdict(summary);
+    const verdict = args.verdict ?? parseVisibleVerdict(summary);
     const signal = resolveReviewerFailureSignal({
       visibleVerdict: verdict,
     });
@@ -95,10 +96,11 @@ export function handleReviewerCompletion(args: {
   task: PairedTask;
   taskId: string;
   summary?: string | null;
+  verdict?: TurnVerdict | null;
 }): void {
   const { task, taskId, summary } = args;
   const now = new Date().toISOString();
-  const verdict = parseVisibleVerdict(summary);
+  const verdict = args.verdict ?? parseVisibleVerdict(summary);
   const signal = resolveReviewerCompletionSignal({
     visibleVerdict: verdict,
     roundTripCount: task.round_trip_count,
