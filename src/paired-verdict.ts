@@ -1,3 +1,5 @@
+import type { ArbiterVerdict } from './types.js';
+
 export type VisibleVerdict =
   | 'step_done'
   | 'task_done'
@@ -7,12 +9,7 @@ export type VisibleVerdict =
   | 'needs_context'
   | 'continue';
 
-export type ArbiterVerdictResult =
-  | 'proceed'
-  | 'revise'
-  | 'reset'
-  | 'escalate'
-  | 'unknown';
+export type ArbiterVerdictResult = ArbiterVerdict | 'unknown';
 
 const VISIBLE_VERDICT_SCAN_LINE_LIMIT = 5;
 
@@ -81,7 +78,7 @@ export function classifyArbiterVerdict(
     const normalized = verdictMatch[1].toLowerCase();
     return normalized === 'continue'
       ? 'proceed'
-      : (normalized as ArbiterVerdictResult);
+      : (normalized as ArbiterVerdict);
   }
   return 'unknown';
 }

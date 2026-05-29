@@ -28,6 +28,16 @@ export {
   type HostEvidenceAction,
 } from './evidence-actions.js';
 export {
+  DEFAULT_SCHEDULE_TASK_CONTEXT_MODE,
+  DEFAULT_TASK_CONTEXT_MODE,
+  DEFAULT_WATCH_CI_CONTEXT_MODE,
+  TASK_CONTEXT_MODES,
+  WATCH_CI_PROMPT_PREFIX,
+  isTaskContextMode,
+  normalizeTaskContextMode,
+  type TaskContextMode,
+} from './task-runtime.js';
+export {
   extractMarkdownImageAttachments,
   extractMediaAttachments,
   extractImageTagPaths,

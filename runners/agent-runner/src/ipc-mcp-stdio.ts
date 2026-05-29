@@ -10,10 +10,16 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { CronExpressionParser } from 'cron-parser';
-import { EJCLAW_ENV, normalizePairedRoomRole } from 'ejclaw-runners-shared';
+import {
+  DEFAULT_SCHEDULE_TASK_CONTEXT_MODE,
+  DEFAULT_TASK_CONTEXT_MODE,
+  DEFAULT_WATCH_CI_CONTEXT_MODE,
+  EJCLAW_ENV,
+  TASK_CONTEXT_MODES,
+  normalizePairedRoomRole,
+} from 'ejclaw-runners-shared';
 import {
   buildCiWatchPrompt,
-  DEFAULT_WATCH_CI_CONTEXT_MODE,
   normalizeWatchCiIntervalSeconds,
 } from './watch-ci.js';
 import { resolveHostEvidenceResponsesDir } from './host-evidence.js';
@@ -142,10 +148,10 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
           'cron: "*/5 * * * *" | interval: milliseconds like "300000" | once: local timestamp like "2026-02-01T15:30:00" (no Z suffix!)',
         ),
       context_mode: z
-        .enum(['group', 'isolated'])
-        .default('group')
+        .enum(TASK_CONTEXT_MODES)
+        .default(DEFAULT_SCHEDULE_TASK_CONTEXT_MODE)
         .describe(
-          'group=runs with chat history and memory, isolated=fresh session (include context in prompt)',
+          'group=runs with chat history and memory, isolated=fresh session (include context in prompt). Default: group.',
         ),
       target_group_jid: z
         .string()
@@ -226,7 +232,7 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
         schedule_value: args.schedule_value,
         agent_type: currentAgentType(),
         room_role: currentRoomRole(),
-        context_mode: args.context_mode || 'group',
+        context_mode: args.context_mode || DEFAULT_SCHEDULE_TASK_CONTEXT_MODE,
         targetJid,
         createdBy: groupFolder,
         timestamp: new Date().toISOString(),
@@ -300,7 +306,7 @@ server.tool(
         'How often to poll in seconds. Defaults to 60 for generic watchers and 15 for GitHub host-driven watchers. Generic watchers require 30+, GitHub host-driven watchers allow 10+.',
       ),
     context_mode: z
-      .enum(['group', 'isolated'])
+      .enum(TASK_CONTEXT_MODES)
       .default(DEFAULT_WATCH_CI_CONTEXT_MODE)
       .describe(
         'group=runs with chat history and memory, isolated=fresh session (include all context in check_instructions). Default: isolated.',

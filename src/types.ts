@@ -4,6 +4,7 @@ import {
   normalizePairedRoomRole,
   normalizePairedRoomRoleOrNull,
   type PairedRoomRole,
+  type TaskContextMode,
 } from 'ejclaw-runners-shared';
 import type { VisibleVerdict } from './paired-verdict.js';
 
@@ -208,12 +209,15 @@ export interface RegisteredGroup {
   workDir?: string; // Working directory for the agent (defaults to group folder)
 }
 
-export type MessageSourceKind =
-  | 'human'
-  | 'bot'
-  | 'trusted_external_bot'
-  | 'ipc_injected_human'
-  | 'ipc_injected_bot';
+export const MESSAGE_SOURCE_KINDS = [
+  'human',
+  'bot',
+  'trusted_external_bot',
+  'ipc_injected_human',
+  'ipc_injected_bot',
+] as const;
+export type MessageSourceKind = (typeof MESSAGE_SOURCE_KINDS)[number];
+export const DEFAULT_MESSAGE_SOURCE_KIND: MessageSourceKind = 'human';
 
 export interface NewMessage {
   id: string;
@@ -242,7 +246,7 @@ export interface ScheduledTask {
   prompt: string;
   schedule_type: 'cron' | 'interval' | 'once';
   schedule_value: string;
-  context_mode: 'group' | 'isolated';
+  context_mode: TaskContextMode;
   next_run: string | null;
   last_run: string | null;
   last_result: string | null;
