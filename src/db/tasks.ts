@@ -1,4 +1,8 @@
 import { Database } from 'bun:sqlite';
+import {
+  DEFAULT_TASK_CONTEXT_MODE,
+  WATCH_CI_PROMPT_PREFIX,
+} from 'ejclaw-runners-shared';
 
 import {
   AgentType,
@@ -70,7 +74,7 @@ export function createTaskInDatabase(
       task.prompt,
       task.schedule_type,
       task.schedule_value,
-      task.context_mode || 'isolated',
+      task.context_mode || DEFAULT_TASK_CONTEXT_MODE,
       task.next_run,
       task.status,
       task.created_at,
@@ -217,10 +221,10 @@ export function hasActiveCiWatcherForChatInDatabase(
   const row = database
     .prepare(
       `SELECT 1 FROM scheduled_tasks
-       WHERE chat_jid = ? AND status = 'active' AND prompt LIKE '[BACKGROUND CI WATCH]%'
+       WHERE chat_jid = ? AND status = 'active' AND prompt LIKE ?
        LIMIT 1`,
     )
-    .get(chatJid);
+    .get(chatJid, `${WATCH_CI_PROMPT_PREFIX}%`);
   return !!row;
 }
 

@@ -1,9 +1,13 @@
+import {
+  DEFAULT_WATCH_CI_CONTEXT_MODE,
+  WATCH_CI_PROMPT_PREFIX,
+} from 'ejclaw-runners-shared';
+
 export const DEFAULT_WATCH_CI_INTERVAL_SECONDS = 60;
 export const MIN_WATCH_CI_INTERVAL_SECONDS = 30;
 export const DEFAULT_GITHUB_WATCH_CI_INTERVAL_SECONDS = 15;
 export const MIN_GITHUB_WATCH_CI_INTERVAL_SECONDS = 10;
 export const MAX_WATCH_CI_INTERVAL_SECONDS = 3600;
-export const DEFAULT_WATCH_CI_CONTEXT_MODE = 'isolated';
 
 export interface NormalizeWatchCiIntervalOptions {
   ciProvider?: 'github';
@@ -48,7 +52,7 @@ export function buildCiWatchPrompt({
   checkInstructions,
 }: BuildCiWatchPromptArgs): string {
   return `
-[BACKGROUND CI WATCH]
+${WATCH_CI_PROMPT_PREFIX}
 
 You are running as an EJClaw background CI watcher.
 

@@ -1,3 +1,5 @@
+import { WATCH_CI_PROMPT_PREFIX } from 'ejclaw-runners-shared';
+
 import { TIMEZONE } from './config.js';
 import type { ScheduledTask } from './types.js';
 import { formatElapsedKorean } from './utils.js';
@@ -8,7 +10,7 @@ export type WatcherStatusPhase =
   | 'retrying'
   | 'completed';
 
-export const WATCH_CI_PREFIX = '[BACKGROUND CI WATCH]';
+export const WATCH_CI_PREFIX = WATCH_CI_PROMPT_PREFIX;
 export const TASK_STATUS_MESSAGE_PREFIX = '\u2063\u2063\u2063';
 export const DEFAULT_WATCH_CI_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 

@@ -1,4 +1,8 @@
 import { CronExpressionParser } from 'cron-parser';
+import {
+  DEFAULT_TASK_CONTEXT_MODE,
+  isTaskContextMode,
+} from 'ejclaw-runners-shared';
 
 import { TIMEZONE } from './config.js';
 import { isWatchCiTask } from './task-watch-status.js';
@@ -98,10 +102,6 @@ function isScheduleType(
   value: unknown,
 ): value is ScheduledTask['schedule_type'] {
   return value === 'cron' || value === 'interval' || value === 'once';
-}
-
-function isContextMode(value: unknown): value is ScheduledTask['context_mode'] {
-  return value === 'group' || value === 'isolated';
 }
 
 function isAgentType(value: unknown): value is AgentType {
@@ -294,9 +294,9 @@ async function handleTaskCreateRoute(
     return jsonResponse({ error: next.error }, { status: 400 });
   }
 
-  const contextMode = isContextMode(body.contextMode)
+  const contextMode = isTaskContextMode(body.contextMode)
     ? body.contextMode
-    : 'isolated';
+    : DEFAULT_TASK_CONTEXT_MODE;
   const agentType = isAgentType(body.agentType)
     ? body.agentType
     : (room.group.agentType ?? 'claude-code');

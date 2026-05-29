@@ -1,4 +1,5 @@
 import { CronExpressionParser } from 'cron-parser';
+import { normalizeTaskContextMode } from 'ejclaw-runners-shared';
 
 import { createTask, findDuplicateCiWatcher } from '../db.js';
 import { normalizeStoredAgentType } from '../db/room-registration.js';
@@ -49,10 +50,7 @@ export function handleScheduleTask(
   const taskId =
     data.taskId ||
     `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const contextMode =
-    data.context_mode === 'group' || data.context_mode === 'isolated'
-      ? data.context_mode
-      : 'isolated';
+  const contextMode = normalizeTaskContextMode(data.context_mode);
   const scheduledAgentType =
     normalizeStoredAgentType(data.agent_type) ??
     target.room.agentType ??

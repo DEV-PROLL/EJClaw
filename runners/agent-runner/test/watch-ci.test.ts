@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import {
+  DEFAULT_WATCH_CI_CONTEXT_MODE,
+  WATCH_CI_PROMPT_PREFIX,
+} from 'ejclaw-runners-shared';
 
 import {
   buildCiWatchPrompt,
-  DEFAULT_WATCH_CI_CONTEXT_MODE,
   DEFAULT_GITHUB_WATCH_CI_INTERVAL_SECONDS,
   normalizeWatchCiIntervalSeconds,
 } from '../src/watch-ci.js';
@@ -16,6 +19,7 @@ describe('watch-ci helpers', () => {
     });
 
     expect(prompt).toContain('PR #42 checks');
+    expect(prompt.startsWith(WATCH_CI_PROMPT_PREFIX)).toBe(true);
     expect(prompt).not.toContain('Task ID:');
     expect(prompt).toContain('cancel_task');
     expect(prompt).toContain('send_message');
