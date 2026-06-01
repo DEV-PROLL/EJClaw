@@ -28,6 +28,11 @@ function parseEnvFile(): Record<string, string> {
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
+    } else {
+      // Strip inline comments (` # ...`) from unquoted values so that
+      // ".env.example" lines like `CODEX_EFFORT=xhigh   # note` don't leak
+      // the comment into the value.
+      value = value.replace(/\s+#.*$/, '').trim();
     }
     result[key] = value;
   }

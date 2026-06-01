@@ -603,13 +603,15 @@ async function buildUsageContent(): Promise<string> {
   let diskUsedGB = '?';
   let diskTotalGB = '?';
   try {
-    const df = execSync('df -B1 / | tail -1', {
+    // `df -k` (1024-byte blocks) is POSIX and works on macOS + Linux;
+    // `df -B1` is GNU-only and errors on macOS.
+    const df = execSync('df -k / | tail -1', {
       encoding: 'utf-8',
       timeout: 5000,
     }).trim();
     const parts = df.split(/\s+/);
-    const diskUsed = parseInt(parts[2], 10);
-    const diskTotal = parseInt(parts[1], 10);
+    const diskUsed = parseInt(parts[2], 10) * 1024;
+    const diskTotal = parseInt(parts[1], 10) * 1024;
     diskPct = Math.round((diskUsed / diskTotal) * 100);
     diskUsedGB = (diskUsed / 1073741824).toFixed(0);
     diskTotalGB = (diskTotal / 1073741824).toFixed(0);

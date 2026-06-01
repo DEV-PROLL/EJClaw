@@ -265,7 +265,13 @@ function pickEnvValue(content: string, key: string): string | undefined {
   const re = new RegExp(`^${key}=(.*)$`, 'm');
   const match = content.match(re);
   if (!match) return undefined;
-  return match[1].trim().replace(/^['"]|['"]$/g, '');
+  let value = match[1].trim();
+  const quoted =
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"));
+  // Strip inline comments (` # ...`) from unquoted values.
+  if (!quoted) value = value.replace(/\s+#.*$/, '').trim();
+  return value.replace(/^['"]|['"]$/g, '');
 }
 
 function readEnvFile(): string {
