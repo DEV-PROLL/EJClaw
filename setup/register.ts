@@ -10,6 +10,7 @@ import { GROUPS_DIR } from '../src/config.js';
 import { assignRoom, initDatabase } from '../src/db.js';
 import { isValidGroupFolder } from '../src/group-folder.js';
 import { logger } from '../src/logger.js';
+import type { AgentType, RoomMode } from '../src/types.js';
 import { emitStatus } from './status.js';
 
 interface RegisterArgs {
@@ -19,6 +20,11 @@ interface RegisterArgs {
   channel: string;
   isMain: boolean;
   assistantNameProvided: boolean;
+  // PodoAI fork additions: bind a room to a project root, mode, and roles.
+  workDir: string;
+  roomMode: string;
+  reviewerAgentType: string;
+  arbiterAgentType: string;
 }
 
 function parseArgs(args: string[]): RegisterArgs {
@@ -29,6 +35,10 @@ function parseArgs(args: string[]): RegisterArgs {
     channel: 'discord',
     isMain: false,
     assistantNameProvided: false,
+    workDir: '',
+    roomMode: '',
+    reviewerAgentType: '',
+    arbiterAgentType: '',
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -47,6 +57,18 @@ function parseArgs(args: string[]): RegisterArgs {
         break;
       case '--is-main':
         result.isMain = true;
+        break;
+      case '--work-dir':
+        result.workDir = args[++i] || '';
+        break;
+      case '--room-mode':
+        result.roomMode = (args[++i] || '').toLowerCase();
+        break;
+      case '--reviewer-agent-type':
+        result.reviewerAgentType = (args[++i] || '').toLowerCase();
+        break;
+      case '--arbiter-agent-type':
+        result.arbiterAgentType = (args[++i] || '').toLowerCase();
         break;
       case '--assistant-name':
         result.assistantNameProvided = true;
@@ -106,6 +128,14 @@ export async function run(args: string[]): Promise<void> {
     name: parsed.name,
     folder: parsed.folder,
     isMain: parsed.isMain,
+    ...(parsed.workDir ? { workDir: parsed.workDir } : {}),
+    ...(parsed.roomMode ? { roomMode: parsed.roomMode as RoomMode } : {}),
+    ...(parsed.reviewerAgentType
+      ? { reviewerAgentType: parsed.reviewerAgentType as AgentType }
+      : {}),
+    ...(parsed.arbiterAgentType
+      ? { arbiterAgentType: parsed.arbiterAgentType as AgentType }
+      : {}),
   });
   logger.info('Assigned room through canonical room service');
 
